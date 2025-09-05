@@ -1,0 +1,11 @@
+{
+  "id": "top-customers-sql",
+  "title": "Top Customers by Spend",
+  "statement": "SQLite DB with orders(customer_id, amount). Return top 3 customers by total spend: id,total ordered by total desc.",
+  "languages": [
+    "sql"
+  ],
+  "stub": {
+    "sql": "SELECT customer_id, SUM(amount) AS total FROM orders GROUP BY 1 ORDER BY total DESC LIMIT 3;"
+  }
+}
