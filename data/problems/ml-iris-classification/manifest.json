@@ -1,0 +1,9 @@
+{
+  "id": "ml-iris-classification",
+  "title": "Iris Flower Classification",
+  "statement": "Build a machine learning model to classify iris flowers based on sepal and petal measurements. Use the provided dataset to train your model and predict the species of new flowers.\n\nDataset: iris.csv with columns: sepal_length, sepal_width, petal_length, petal_width, species\n\nRequirements:\n1. Load and explore the data\n2. Preprocess the data (if needed)\n3. Train a classification model\n4. Evaluate model performance\n5. Make predictions on test data\n\nLibraries available: scikit-learn, pandas, numpy, matplotlib",
+  "languages": ["python"],
+  "stub": {
+    "python": "import pandas as pd\nimport numpy as np\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.ensemble import RandomForestClassifier\nfrom sklearn.metrics import accuracy_score\nimport matplotlib.pyplot as plt\n\n# Load the dataset\ndf = pd.read_csv('IRIS.csv')\nprint('Dataset shape:', df.shape)\nprint('Columns:', df.columns.tolist())\nprint('Species distribution:')\nprint(df['species'].value_counts())\n\n# TODO: Implement your ML model here\n"
+  }
+}

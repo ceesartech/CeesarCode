@@ -30,7 +30,7 @@ type ExecJob struct {
 	Language      string `json:"language"`
 }
 
-var dataDir = "data/problems"
+var dataDir = "./data/problems"
 
 func main() {
 	mux := http.NewServeMux()
@@ -166,12 +166,9 @@ func submit(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("JSON bytes length: %d", len(jb))
 	log.Printf("Sending job to executor: %s", string(jb))
-	exe := "dist/release/executor"
+	exe := "../executor-rs/target/release/executor"
 	if _, err := os.Stat(exe); err != nil {
-		exe = "executor-rs/target/release/executor"
-		if _, err := os.Stat(exe); err != nil {
-			exe = "executor-rs/target/debug/executor"
-		}
+		exe = "../executor-rs/target/debug/executor"
 	}
 	cmd := exec.Command(exe)
 	cmd.Stdin = strings.NewReader(string(jb))
@@ -412,27 +409,24 @@ func listUploadedFiles(w http.ResponseWriter, r *http.Request, problemID string)
 	uploadDir := filepath.Join(dataDir, problemID, "uploads")
 	log.Printf("Listing files in directory: %s", uploadDir)
 
-	// Always ensure we return a valid JSON array, never null
-	fileList := make([]map[string]interface{}, 0)
-
 	files, err := os.ReadDir(uploadDir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			log.Printf("Upload directory doesn't exist: %s, returning empty array", uploadDir)
-		} else {
-			log.Printf("Failed to read upload directory: %v, returning empty array", err)
+			// Return empty array if directory doesn't exist
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode([]map[string]interface{}{})
+			return
 		}
-		// Always return empty array instead of error for missing directories
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(fileList)
+		log.Printf("Failed to read upload directory: %v", err)
+		http.Error(w, "Internal server error", 500)
 		return
 	}
 
+	var fileList []map[string]interface{}
 	for _, file := range files {
 		if !file.IsDir() {
 			fileInfo, err := file.Info()
 			if err != nil {
-				log.Printf("Failed to get file info for %s: %v, skipping", file.Name(), err)
 				continue
 			}
 
@@ -445,12 +439,7 @@ func listUploadedFiles(w http.ResponseWriter, r *http.Request, problemID string)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	// Ensure we always encode the array, even if empty
-	if err := json.NewEncoder(w).Encode(fileList); err != nil {
-		log.Printf("Failed to encode file list as JSON: %v", err)
-		// Fallback to writing empty array manually
-		w.Write([]byte("[]"))
-	}
+	json.NewEncoder(w).Encode(fileList)
 }
 
 func deleteUploadedFile(w http.ResponseWriter, r *http.Request, problemID, filename string) {

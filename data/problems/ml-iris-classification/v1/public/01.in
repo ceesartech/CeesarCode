@@ -1,0 +1,2 @@
+# Test input for ML model
+# Expected: Model should load data, train, and achieve reasonable accuracy

@@ -1,0 +1,13 @@
+{
+  "id": "shell-hello",
+  "title": "Shell Hello World",
+  "statement": "Write a shell script that prints 'Hello, World!' to stdout.",
+  "languages": [
+    "bash",
+    "sh"
+  ],
+  "stub": {
+    "bash": "#!/bin/bash\necho 'Hello, World!'",
+    "sh": "#!/bin/sh\necho 'Hello, World!'"
+  }
+}
