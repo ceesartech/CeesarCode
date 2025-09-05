@@ -23,16 +23,22 @@
 ```mermaid
 flowchart LR
   UI[React UI] -->|POST /api/submit| API(Go Backend)
-  API -->|stdin job.json| EXE(Rust Executor)
+  API -->|stdin job.json| EXE[Rust Executor]
+
   subgraph Sandbox
     direction LR
-    DKR[Docker Container]:::gray OR FC[Firecracker microVM]:::gray
+    DKR[Docker Container]
+    FC[Firecracker microVM]
   end
-  EXE <-- optional --> Sandbox
-  Sandbox -->|/workspace/result.json\n(stdout JSON)| EXE
+
+  EXE -- optional --> DKR
+  EXE -- optional --> FC
+  DKR -->|writes /workspace/result.json| EXE
+  FC  -->|writes /workspace/result.json| EXE
   EXE --> API --> UI
 
   classDef gray fill:#f2f2f2,stroke:#999,stroke-width:1px,color:#333
+  class DKR,FC gray;
 ```
 
 **Data paths**
