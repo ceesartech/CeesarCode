@@ -8,6 +8,6 @@
   ],
   "stub": {
     "python": "n=int(input().strip());import sys\nvals=list(map(float,sys.stdin.read().split()))\nprint(sum(vals)/n)",
-    "cpp": "#include <bits/stdc++.h>\nusing namespace std;int main(){ios::sync_with_stdio(false);cin.tie(nullptr);int n;cin>>n;vector<double>a(n);for(int i=0;i<n;i++)cin>>a[i];double s=0;for(double x:a)s+=x;cout.setf(std::ios::fixed);cout<<setprecision(6)<<s/n;}"
+    "cpp": "#include <iostream>\n#include <vector>\n#include <iomanip>\nusing namespace std;\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    int n;\n    cin >> n;\n    vector<double> a(n);\n    for(int i = 0; i < n; i++) cin >> a[i];\n    double s = 0;\n    for(double x : a) s += x;\n    cout << fixed << setprecision(1) << s/n;\n    return 0;\n}"
   }
 }

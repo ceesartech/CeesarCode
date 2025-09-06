@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  ceesarcode-production:
+    build:
+      context: .
+      dockerfile: Dockerfile.full-languages
+    container_name: ceesarcode-full-languages
+    ports:
+      - "8080:8080"
+    environment:
+      - EXECUTOR_MODE=docker
+      - TZ=UTC
+    volumes:
+      - ./data:/app/data
+      - /tmp/ceesarcode-submissions:/tmp/ceesarcode-submissions
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/problems"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s  # Longer start period for language setup
+    labels:
+      - "com.ceesarcode.description=CeesarCode Judge with 13 Programming Languages"
+      - "com.ceesarcode.languages=python,javascript,cpp,java,go,rust,ruby,swift,c,bash,kotlin,scala,sql"

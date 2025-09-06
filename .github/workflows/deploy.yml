@@ -1,0 +1,81 @@
+name: Deploy CeesarCode to Cloud
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy-frontend:
+    name: Deploy Frontend to Cloudflare Pages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: cd frontend && npm ci
+
+      - name: Build frontend
+        run: cd frontend && npm run build
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: ceesarcode
+          directory: frontend/dist
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy-backend:
+    name: Deploy Backend to Fly.io
+    runs-on: ubuntu-latest
+    needs: deploy-frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Fly.io CLI
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy to Fly.io
+        run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  verify-deployment:
+    name: Verify All Languages Work in Cloud
+    runs-on: ubuntu-latest
+    needs: deploy-backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Wait for deployment
+        run: sleep 60
+
+      - name: Test languages in cloud
+        run: |
+          # Test a few key languages to verify cloud deployment
+          echo "Testing Python..."
+          curl -X POST https://ceesarcode.fly.dev/api/submit \
+            -H "Content-Type: application/json" \
+            -d '{"problemId":"float-mean","language":"python","files":{"Main.py":"print(2.0)"}}'
+          
+          echo "Testing JavaScript..."
+          curl -X POST https://ceesarcode.fly.dev/api/submit \
+            -H "Content-Type: application/json" \
+            -d '{"problemId":"float-mean","language":"javascript","files":{"main.js":"console.log(\"2.0\")"}}'
+          
+          echo "Testing C++..."
+          curl -X POST https://ceesarcode.fly.dev/api/submit \
+            -H "Content-Type: application/json" \
+            -d '{"problemId":"float-mean","language":"cpp","files":{"Main.cpp":"#include<iostream>\nusing namespace std;\nint main(){cout<<\"2.0\";return 0;}"}}'

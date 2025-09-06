@@ -194,6 +194,52 @@ const safeArrayAccess = (array, operation = 'length') => {
   return operation === 'length' ? array.length : array
 }
 
+// Language configuration for universal file handling
+const LANGUAGE_CONFIG = {
+  python: { extension: 'py', fileName: 'Main.py' },
+  cpp: { extension: 'cpp', fileName: 'Main.cpp' },
+  c: { extension: 'cpp', fileName: 'Main.cpp' }, // C uses .cpp for simplicity
+  java: { extension: 'java', fileName: 'Main.java' },
+  kotlin: { extension: 'kt', fileName: 'Main.kt' },
+  scala: { extension: 'scala', fileName: 'Main.scala' },
+  go: { extension: 'go', fileName: 'main.go' },
+  rust: { extension: 'rs', fileName: 'main.rs' },
+  swift: { extension: 'swift', fileName: 'main.swift' },
+  ruby: { extension: 'rb', fileName: 'main.rb' },
+  javascript: { extension: 'js', fileName: 'main.js' },
+  typescript: { extension: 'ts', fileName: 'main.ts' },
+  bash: { extension: 'sh', fileName: 'script.sh' },
+  sh: { extension: 'sh', fileName: 'script.sh' },
+  sql: { extension: 'txt', fileName: 'code.txt' }
+}
+
+// Get file name for a given language
+const getFileNameForLanguage = (language) => {
+  return LANGUAGE_CONFIG[language]?.fileName || 'code.txt'
+}
+
+// Get default stub code for a language when problem doesn't provide one
+const getDefaultStubForLanguage = (language) => {
+  const stubs = {
+    python: '# Write your solution here\n',
+    cpp: '#include <iostream>\nusing namespace std;\n\nint main() {\n    // Write your solution here\n    return 0;\n}',
+    c: '#include <stdio.h>\n\nint main() {\n    // Write your solution here\n    return 0;\n}',
+    java: 'public class Main {\n    public static void main(String[] args) {\n        // Write your solution here\n    }\n}',
+    kotlin: 'fun main() {\n    // Write your solution here\n}',
+    scala: 'object Main {\n  def main(args: Array[String]): Unit = {\n    // Write your solution here\n  }\n}',
+    go: 'package main\n\nimport "fmt"\n\nfunc main() {\n    // Write your solution here\n}',
+    rust: 'fn main() {\n    // Write your solution here\n}',
+    swift: '// Write your solution here\n// Note: Use print() for output, avoid Foundation imports for compatibility',
+    ruby: '# Write your solution here\n',
+    javascript: '// Write your solution here\n',
+    typescript: '// Write your TypeScript solution here\n// Note: Basic Node.js globals are available\n',
+    bash: '#!/bin/bash\n# Write your solution here\n',
+    sh: '#!/bin/sh\n# Write your solution here\n',
+    sql: '-- Write your SQL query here\n'
+  }
+  return stubs[language] || '// Write your solution here\n'
+}
+
 export default function App() {
   const [problems, setProblems] = useState([])
   const [selectedProblem, setSelectedProblem] = useState(null)
@@ -551,22 +597,16 @@ export default function App() {
         let files = {}
 
         // Create appropriate file based on selected language
-        if (selectedLanguage === 'python') {
-          // For Python, accumulate code from previous cells
-          accumulatedCode = previousCells.map(c => c.code).join('\n') + '\n' + cell.code
-          files['Main.py'] = accumulatedCode
-        } else if (selectedLanguage === 'scala') {
+        const fileName = getFileNameForLanguage(selectedLanguage)
+        
+        if (selectedLanguage === 'scala') {
           // For Scala, we can accumulate but it's more complex due to object-oriented nature
           // For now, just run the current cell
-          files['Main.scala'] = cell.code
-        } else if (selectedLanguage === 'javascript') {
-          // For JavaScript, accumulate code from previous cells
-          accumulatedCode = previousCells.map(c => c.code).join('\n') + '\n' + cell.code
-          files['main.js'] = accumulatedCode
+          files[fileName] = cell.code
         } else {
-          // Fallback to Python behavior
+          // For most languages, accumulate code from previous cells
           accumulatedCode = previousCells.map(c => c.code).join('\n') + '\n' + cell.code
-          files['Main.py'] = accumulatedCode
+          files[fileName] = accumulatedCode
         }
 
         const response = await fetch('/api/submit', {
@@ -637,22 +677,16 @@ export default function App() {
       let files = {}
 
       // Create appropriate file based on selected language
-      if (selectedLanguage === 'python') {
-        // For Python, accumulate code from previous cells
-        accumulatedCode = previousCells.map(c => c.code).join('\n') + '\n' + cell.code
-        files['Main.py'] = accumulatedCode
-      } else if (selectedLanguage === 'scala') {
+      const fileName = getFileNameForLanguage(selectedLanguage)
+      
+      if (selectedLanguage === 'scala') {
         // For Scala, we can accumulate but it's more complex due to object-oriented nature
         // For now, just run the current cell
-        files['Main.scala'] = cell.code
-      } else if (selectedLanguage === 'javascript') {
-        // For JavaScript, accumulate code from previous cells
-        accumulatedCode = previousCells.map(c => c.code).join('\n') + '\n' + cell.code
-        files['main.js'] = accumulatedCode
+        files[fileName] = cell.code
       } else {
-        // Fallback to Python behavior
+        // For most languages, accumulate code from previous cells
         accumulatedCode = previousCells.map(c => c.code).join('\n') + '\n' + cell.code
-        files['Main.py'] = accumulatedCode
+        files[fileName] = accumulatedCode
       }
 
       const response = await fetch('/api/submit', {
@@ -820,12 +854,16 @@ export default function App() {
         const firstLanguage = problem.Languages && problem.Languages[0] ? problem.Languages[0] : 'python'
         setSelectedLanguage(firstLanguage)
 
-        // Load stub code if available
+        // Load stub code for the selected language
+        let stubCode = ''
         if (problem.Stub && problem.Stub[firstLanguage]) {
-          setCode(problem.Stub[firstLanguage])
+          // Use problem-specific stub if available
+          stubCode = problem.Stub[firstLanguage]
         } else {
-          setCode('') // Clear code for new problems
+          // Use default stub for the language
+          stubCode = getDefaultStubForLanguage(firstLanguage)
         }
+        setCode(stubCode)
 
         // Fetch uploaded files for this problem
         fetchUploadedFiles(selectedProblem.ID)
@@ -854,14 +892,12 @@ export default function App() {
         // For Jupyter mode, combine all executed cells
         const executedCells = jupyterCells.filter(c => c.hasExecuted && c.code.trim())
         const combinedCode = executedCells.map(c => c.code).join('\n')
-        files[`Main.${selectedLanguage === 'cpp' ? 'cpp' : selectedLanguage === 'java' ? 'java' : 'py'}`] = combinedCode
+        const fileName = getFileNameForLanguage(selectedLanguage)
+        files[fileName] = combinedCode
       } else {
         // For IDE mode, use the current code
-        const extension = selectedLanguage === 'cpp' ? 'cpp' : 
-                         selectedLanguage === 'java' ? 'java' :
-                         selectedLanguage === 'bash' || selectedLanguage === 'sh' ? 'sh' :
-                         selectedLanguage === 'sql' ? 'txt' : 'py'
-        files[`Main.${extension}`] = code
+        const fileName = getFileNameForLanguage(selectedLanguage)
+        files[fileName] = code
       }
 
       const response = await fetch('/api/submit', {
@@ -899,19 +935,8 @@ export default function App() {
 
     try {
       const files = {}
-      if (selectedLanguage === 'python') files['Main.py'] = code
-      else if (selectedLanguage === 'cpp' || selectedLanguage === 'c') files['Main.cpp'] = code
-      else if (selectedLanguage === 'java') files['Main.java'] = code
-      else if (selectedLanguage === 'kotlin') files['Main.kt'] = code
-      else if (selectedLanguage === 'scala') files['Main.scala'] = code
-      else if (selectedLanguage === 'go') files['main.go'] = code
-      else if (selectedLanguage === 'rust') files['main.rs'] = code
-      else if (selectedLanguage === 'swift') files['main.swift'] = code
-      else if (selectedLanguage === 'ruby') files['main.rb'] = code
-      else if (selectedLanguage === 'javascript') files['main.js'] = code
-      else if (selectedLanguage === 'typescript') files['main.ts'] = code
-      else if (selectedLanguage === 'bash' || selectedLanguage === 'sh') files['script.sh'] = code
-      else files['code.txt'] = code
+      const fileName = getFileNameForLanguage(selectedLanguage)
+      files[fileName] = code
 
       console.log('Submitting code:', {
         problemId: selectedProblem.ID,
@@ -2070,7 +2095,20 @@ export default function App() {
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <select
                       value={selectedLanguage}
-                      onChange={(e) => setSelectedLanguage(e.target.value)}
+                      onChange={(e) => {
+                        const newLanguage = e.target.value
+                        setSelectedLanguage(newLanguage)
+                        // Load stub code for the new language
+                        let newCode = ''
+                        if (selectedProblem && selectedProblem.Stub && selectedProblem.Stub[newLanguage]) {
+                          // Use problem-specific stub if available
+                          newCode = selectedProblem.Stub[newLanguage]
+                        } else {
+                          // Use default stub for the language
+                          newCode = getDefaultStubForLanguage(newLanguage)
+                        }
+                        setCode(newCode)
+                      }}
                       style={{
                         padding: '6px 8px',
                         border: `1px solid ${theme.border}`,
@@ -2198,7 +2236,20 @@ export default function App() {
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                       <select
                         value={selectedLanguage}
-                        onChange={(e) => setSelectedLanguage(e.target.value)}
+                        onChange={(e) => {
+                          const newLanguage = e.target.value
+                          setSelectedLanguage(newLanguage)
+                          // Load stub code for the new language
+                          let newCode = ''
+                          if (selectedProblem && selectedProblem.Stub && selectedProblem.Stub[newLanguage]) {
+                            // Use problem-specific stub if available
+                            newCode = selectedProblem.Stub[newLanguage]
+                          } else {
+                            // Use default stub for the language
+                            newCode = getDefaultStubForLanguage(newLanguage)
+                          }
+                          setCode(newCode)
+                        }}
                         style={{
                           padding: '6px 8px',
                           border: `1px solid ${theme.border}`,

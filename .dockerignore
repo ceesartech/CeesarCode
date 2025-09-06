@@ -1,0 +1,292 @@
+# flyctl launch added from .gitignore
+# =============================================================================
+# CeesarCode Project .gitignore
+# =============================================================================
+
+# =============================================================================
+# Build Artifacts & Binaries
+# =============================================================================
+
+# Go binaries
+backend/main
+backend/server
+bin
+main
+server
+
+# Rust build artifacts
+executor-rs/target
+dist/release
+
+# Frontend build artifacts
+frontend/dist
+dist
+
+# =============================================================================
+# Dependencies & Package Managers
+# =============================================================================
+
+# Node.js dependencies
+frontend/node_modules
+**/node_modules
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/package-lock.json
+
+# Go modules
+**/go.sum
+
+# Rust dependencies (keep Cargo.lock for applications)
+# /executor-rs/Cargo.lock  # Keep this for reproducible builds
+
+# Python virtual environment
+**/.venv
+**/venv
+**/env
+**/.env
+
+# =============================================================================
+# Logs & Temporary Files
+# =============================================================================
+
+# Log files
+**/*.log
+backend/server.log
+server.log
+
+# Temporary files
+**/*.tmp
+**/*.temp
+**/temp*
+**/.cache
+**/.tmp
+
+# Test files (project-specific)
+**/test*.csv
+**/test*.json
+**/test_*.csv
+**/test_*.json
+**/*_test.*
+
+# =============================================================================
+# IDE & Editor Files
+# =============================================================================
+
+# Visual Studio Code
+**/.vscode
+**/*.code-workspace
+
+# IntelliJ IDEA
+**/.idea
+**/*.iml
+
+# Vim
+**/*.swp
+**/*.swo
+**/*~
+
+# Emacs
+**/*~
+**/\#*\#
+**/.\#*
+
+# Sublime Text
+**/*.sublime-project
+**/*.sublime-workspace
+
+# =============================================================================
+# Operating System Files
+# =============================================================================
+
+# macOS
+**/.DS_Store
+**/.DS_Store?
+**/._*
+**/.Spotlight-V100
+**/.Trashes
+**/ehthumbs.db
+**/Thumbs.db
+
+# Windows
+**/Thumbs.db
+**/ehthumbs.db
+**/Desktop.ini
+**/$RECYCLE.BIN
+
+# Linux
+**/*~
+
+# =============================================================================
+# Development & Debug Files
+# =============================================================================
+
+# Backup files
+**/*.backup
+**/*.bak
+**/*.orig
+frontend/src/App.jsx.backup
+frontend/src/App.jsx.broken
+
+# Debug files
+**/debug.log
+**/*.debug
+
+# =============================================================================
+# Runtime & Process Files
+# =============================================================================
+
+# Process IDs
+**/*.pid
+**/*.seed
+**/*.pid.lock
+
+# Coverage reports
+**/coverage
+**/*.lcov
+**/.nyc_output
+
+# =============================================================================
+# Environment & Configuration
+# =============================================================================
+
+# Environment variables
+**/.env
+**/.env.local
+**/.env.development.local
+**/.env.test.local
+**/.env.production.local
+
+# Configuration overrides
+**/config.local.*
+**/*.local.json
+
+# =============================================================================
+# Data & Uploads
+# =============================================================================
+
+# User uploaded data files (but keep sample data)
+data/problems/*/uploads/*.csv
+data/problems/*/uploads/*.json
+data/problems/*/uploads/*.txt
+data/problems/*/uploads/*.xlsx
+data/problems/*/uploads/*.xls
+
+# Keep sample/demo data files
+!data/problems/uploads/IRIS.csv
+!sample-questions.json
+
+# Dynamic problem directories (created by users)
+data/problems/test-*
+data/problems/user-*
+
+# Keep core problem examples but ignore test data
+# Keep: float-mean, ml-iris-classification, shell-hello, top-customers-sql
+
+# =============================================================================
+# Docker & Containerization
+# =============================================================================
+
+# Docker volumes
+**/docker-data
+**/.docker
+
+# =============================================================================
+# Security & Sensitive Files
+# =============================================================================
+
+# API keys and secrets
+**/*.key
+**/*.pem
+**/*.crt
+**/secrets
+**/.secrets
+
+# =============================================================================
+# Performance & Profiling
+# =============================================================================
+
+# Profiling data
+**/*.prof
+**/*.pprof
+**/profile.out
+**/mem.out
+**/cpu.out
+
+# =============================================================================
+# Documentation Build
+# =============================================================================
+
+# Generated documentation
+**/docs/build
+**/site
+
+# =============================================================================
+# Language-Specific Ignores
+# =============================================================================
+
+# Python
+**/__pycache__
+**/*.py[cod]
+**/*$py.class
+**/*.so
+**/.Python
+**/build
+**/develop-eggs
+**/downloads
+**/eggs
+**/.eggs
+**/lib
+**/lib64
+**/parts
+**/sdist
+**/var
+**/wheels
+**/*.egg-info
+**/.installed.cfg
+**/*.egg
+
+# Rust
+**/**/*.rs.bk
+**/Cargo.lock
+
+# Go
+**/*.exe
+**/*.exe~
+**/*.dll
+**/*.so
+**/*.dylib
+**/*.test
+
+# =============================================================================
+# Submission & Test Data
+# =============================================================================
+
+# Temporary submission directories
+var/folders/*/ceesarcode-submissions
+tmp/ceesarcode-submissions
+
+# =============================================================================
+# Project-Specific Exclusions
+# =============================================================================
+
+# Sample and test files that are not part of core functionality
+test.csv
+test_data.csv
+test_submit.json
+
+# Development artifacts
+frontend/test.json
+
+# Keep sample-questions.json as it's documentation/example
+# Keep core infrastructure files
+!Dockerfile
+!docker-compose.yml
+!build.sh
+!build.bat
+!go.mod
+!main.go
+
+# flyctl launch added from .venv/.gitignore
+.venv/**/*
+fly.toml
