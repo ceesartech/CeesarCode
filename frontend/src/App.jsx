@@ -273,6 +273,7 @@ export default function App() {
   const [jupyterCells, setJupyterCells] = useState([
     { id: 1, code: '', output: '', isRunning: false, hasExecuted: false }
   ])
+  const [showShortcuts, setShowShortcuts] = useState(false)
 
   // All supported languages
   const allSupportedLanguages = [
@@ -281,6 +282,427 @@ export default function App() {
   ]
 
   const theme = isDarkMode ? styles.dark : styles.light
+
+  // Keyboard shortcut functions
+  const toggleComment = () => {
+    const textarea = document.querySelector('textarea')
+    if (!textarea) return
+
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const selectedText = code.substring(start, end)
+    const lines = selectedText.split('\n')
+    
+    // Check if all lines are commented
+    const isAllCommented = lines.every(line => {
+      const trimmed = line.trim()
+      return trimmed === '' || 
+        (selectedLanguage === 'python' && trimmed.startsWith('#')) ||
+        (['cpp', 'c', 'java', 'javascript', 'typescript', 'go', 'rust', 'swift', 'kotlin', 'scala'].includes(selectedLanguage) && trimmed.startsWith('//')) ||
+        (['bash', 'sh'].includes(selectedLanguage) && trimmed.startsWith('#')) ||
+        (selectedLanguage === 'sql' && trimmed.startsWith('--'))
+    })
+
+    let newText
+    if (isAllCommented) {
+      // Uncomment
+      newText = lines.map(line => {
+        const trimmed = line.trim()
+        if (trimmed === '') return line
+        
+        if (selectedLanguage === 'python' && trimmed.startsWith('#')) {
+          return line.replace(/^(\s*)#/, '$1')
+        } else if (['cpp', 'c', 'java', 'javascript', 'typescript', 'go', 'rust', 'swift', 'kotlin', 'scala'].includes(selectedLanguage) && trimmed.startsWith('//')) {
+          return line.replace(/^(\s*)\/\//, '$1')
+        } else if (['bash', 'sh'].includes(selectedLanguage) && trimmed.startsWith('#')) {
+          return line.replace(/^(\s*)#/, '$1')
+        } else if (selectedLanguage === 'sql' && trimmed.startsWith('--')) {
+          return line.replace(/^(\s*)--/, '$1')
+        }
+        return line
+      }).join('\n')
+    } else {
+      // Comment
+      newText = lines.map(line => {
+        const trimmed = line.trim()
+        if (trimmed === '') return line
+        
+        if (selectedLanguage === 'python') {
+          return line.replace(/^(\s*)/, '$1# ')
+        } else if (['cpp', 'c', 'java', 'javascript', 'typescript', 'go', 'rust', 'swift', 'kotlin', 'scala'].includes(selectedLanguage)) {
+          return line.replace(/^(\s*)/, '$1// ')
+        } else if (['bash', 'sh'].includes(selectedLanguage)) {
+          return line.replace(/^(\s*)/, '$1# ')
+        } else if (selectedLanguage === 'sql') {
+          return line.replace(/^(\s*)/, '$1-- ')
+        }
+        return line
+      }).join('\n')
+    }
+
+    const newCode = code.substring(0, start) + newText + code.substring(end)
+    setCode(newCode)
+    
+    // Restore selection
+    setTimeout(() => {
+      textarea.focus()
+      textarea.setSelectionRange(start, start + newText.length)
+    }, 0)
+  }
+
+  const formatCode = () => {
+    // Basic formatting for common languages
+    if (['python', 'javascript', 'typescript'].includes(selectedLanguage)) {
+      // Simple indentation fix
+      const lines = code.split('\n')
+      const formattedLines = lines.map(line => {
+        // Remove trailing whitespace
+        return line.replace(/\s+$/, '')
+      })
+      setCode(formattedLines.join('\n'))
+    }
+  }
+
+  const clearCode = () => {
+    if (window.confirm('Are you sure you want to clear all code?')) {
+      setCode('')
+    }
+  }
+
+  const duplicateLine = () => {
+    const textarea = document.querySelector('textarea')
+    if (!textarea) return
+
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const lines = code.split('\n')
+    let currentLine = 0
+    let charCount = 0
+
+    for (let i = 0; i < lines.length; i++) {
+      if (charCount + lines[i].length >= start) {
+        currentLine = i
+        break
+      }
+      charCount += lines[i].length + 1 // +1 for newline
+    }
+
+    const lineToDuplicate = lines[currentLine]
+    lines.splice(currentLine + 1, 0, lineToDuplicate)
+    setCode(lines.join('\n'))
+  }
+
+  const moveLineUp = () => {
+    const textarea = document.querySelector('textarea')
+    if (!textarea) return
+
+    const start = textarea.selectionStart
+    const lines = code.split('\n')
+    let currentLine = 0
+    let charCount = 0
+
+    for (let i = 0; i < lines.length; i++) {
+      if (charCount + lines[i].length >= start) {
+        currentLine = i
+        break
+      }
+      charCount += lines[i].length + 1
+    }
+
+    if (currentLine > 0) {
+      [lines[currentLine - 1], lines[currentLine]] = [lines[currentLine], lines[currentLine - 1]]
+      setCode(lines.join('\n'))
+    }
+  }
+
+  const moveLineDown = () => {
+    const textarea = document.querySelector('textarea')
+    if (!textarea) return
+
+    const start = textarea.selectionStart
+    const lines = code.split('\n')
+    let currentLine = 0
+    let charCount = 0
+
+    for (let i = 0; i < lines.length; i++) {
+      if (charCount + lines[i].length >= start) {
+        currentLine = i
+        break
+      }
+      charCount += lines[i].length + 1
+    }
+
+    if (currentLine < lines.length - 1) {
+      [lines[currentLine], lines[currentLine + 1]] = [lines[currentLine + 1], lines[currentLine]]
+      setCode(lines.join('\n'))
+    }
+  }
+
+  const deleteLine = () => {
+    const textarea = document.querySelector('textarea')
+    if (!textarea) return
+
+    const start = textarea.selectionStart
+    const lines = code.split('\n')
+    let currentLine = 0
+    let charCount = 0
+
+    for (let i = 0; i < lines.length; i++) {
+      if (charCount + lines[i].length >= start) {
+        currentLine = i
+        break
+      }
+      charCount += lines[i].length + 1
+    }
+
+    if (lines.length > 1) {
+      lines.splice(currentLine, 1)
+      setCode(lines.join('\n'))
+    }
+  }
+
+  const toggleDarkMode = () => {
+    const newDarkMode = !isDarkMode
+    setIsDarkMode(newDarkMode)
+    localStorage.setItem('ceesarcode-dark-mode', JSON.stringify(newDarkMode))
+  }
+
+  const cycleLanguage = (direction = 1) => {
+    const currentIndex = allSupportedLanguages.indexOf(selectedLanguage)
+    const nextIndex = (currentIndex + direction + allSupportedLanguages.length) % allSupportedLanguages.length
+    const newLanguage = allSupportedLanguages[nextIndex]
+    setSelectedLanguage(newLanguage)
+    
+    // Load stub code for the new language
+    if (selectedProblem && selectedProblem.Stub && selectedProblem.Stub[newLanguage]) {
+      setCode(selectedProblem.Stub[newLanguage])
+    } else {
+      setCode(getDefaultStubForLanguage(newLanguage))
+    }
+  }
+
+  const showKeyboardShortcuts = () => {
+    setShowShortcuts(true)
+  }
+
+  // Tab completion and indentation functions
+  const getLanguageKeywords = (language) => {
+    const keywords = {
+      python: ['def', 'class', 'if', 'else', 'elif', 'for', 'while', 'try', 'except', 'finally', 'with', 'import', 'from', 'return', 'yield', 'lambda', 'and', 'or', 'not', 'in', 'is', 'True', 'False', 'None'],
+      javascript: ['function', 'const', 'let', 'var', 'if', 'else', 'for', 'while', 'switch', 'case', 'break', 'continue', 'return', 'try', 'catch', 'finally', 'throw', 'new', 'this', 'class', 'extends', 'import', 'export', 'async', 'await'],
+      typescript: ['function', 'const', 'let', 'var', 'if', 'else', 'for', 'while', 'switch', 'case', 'break', 'continue', 'return', 'try', 'catch', 'finally', 'throw', 'new', 'this', 'class', 'extends', 'import', 'export', 'async', 'await', 'interface', 'type', 'enum', 'namespace'],
+      java: ['public', 'private', 'protected', 'static', 'final', 'abstract', 'class', 'interface', 'extends', 'implements', 'if', 'else', 'for', 'while', 'switch', 'case', 'break', 'continue', 'return', 'try', 'catch', 'finally', 'throw', 'new', 'this', 'super'],
+      cpp: ['int', 'float', 'double', 'char', 'bool', 'void', 'if', 'else', 'for', 'while', 'switch', 'case', 'break', 'continue', 'return', 'try', 'catch', 'throw', 'new', 'delete', 'class', 'struct', 'public', 'private', 'protected'],
+      c: ['int', 'float', 'double', 'char', 'void', 'if', 'else', 'for', 'while', 'switch', 'case', 'break', 'continue', 'return', 'struct', 'typedef', 'enum'],
+      go: ['func', 'var', 'const', 'type', 'struct', 'interface', 'if', 'else', 'for', 'range', 'switch', 'case', 'break', 'continue', 'return', 'go', 'chan', 'select', 'defer', 'panic', 'recover'],
+      rust: ['fn', 'let', 'const', 'static', 'if', 'else', 'for', 'while', 'loop', 'match', 'break', 'continue', 'return', 'struct', 'enum', 'impl', 'trait', 'use', 'mod', 'pub', 'async', 'await'],
+      kotlin: ['fun', 'val', 'var', 'class', 'interface', 'if', 'else', 'for', 'while', 'when', 'break', 'continue', 'return', 'try', 'catch', 'finally', 'throw', 'data', 'object', 'companion'],
+      scala: ['def', 'val', 'var', 'class', 'object', 'trait', 'if', 'else', 'for', 'while', 'match', 'case', 'break', 'continue', 'return', 'try', 'catch', 'finally', 'throw', 'import', 'package'],
+      swift: ['func', 'let', 'var', 'class', 'struct', 'enum', 'protocol', 'if', 'else', 'for', 'while', 'switch', 'case', 'break', 'continue', 'return', 'try', 'catch', 'throw', 'import'],
+      ruby: ['def', 'class', 'module', 'if', 'else', 'elsif', 'for', 'while', 'case', 'when', 'break', 'next', 'return', 'begin', 'rescue', 'ensure', 'raise', 'yield', 'end'],
+      bash: ['if', 'then', 'else', 'elif', 'fi', 'for', 'while', 'do', 'done', 'case', 'esac', 'function', 'return', 'break', 'continue', 'echo', 'read', 'cd', 'ls', 'grep', 'awk', 'sed'],
+      sql: ['SELECT', 'FROM', 'WHERE', 'GROUP', 'BY', 'ORDER', 'HAVING', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'ALTER', 'DROP', 'TABLE', 'INDEX', 'VIEW', 'JOIN', 'INNER', 'LEFT', 'RIGHT', 'OUTER']
+    }
+    return keywords[language] || []
+  }
+
+  const handleTabKey = (e) => {
+    e.preventDefault()
+    const textarea = e.target
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const currentLine = code.substring(0, start).split('\n').pop()
+    const currentWord = currentLine.split(/\s+/).pop() || ''
+    
+    if (e.shiftKey) {
+      // Shift+Tab: Remove indentation
+      handleReverseTab(textarea, start, end)
+    } else {
+      // Tab: Smart indentation or completion
+      if (currentWord.length > 0 && !currentWord.includes('\n')) {
+        // Try tab completion
+        const completion = tryTabCompletion(currentWord, selectedLanguage)
+        if (completion) {
+          const newCode = code.substring(0, start - currentWord.length) + completion + code.substring(end)
+          setCode(newCode)
+          setTimeout(() => {
+            textarea.focus()
+            textarea.setSelectionRange(start - currentWord.length + completion.length, start - currentWord.length + completion.length)
+          }, 0)
+        } else {
+          // Add indentation
+          handleTabIndentation(textarea, start, end)
+        }
+      } else {
+        // Add indentation
+        handleTabIndentation(textarea, start, end)
+      }
+    }
+  }
+
+  const handleTabIndentation = (textarea, start, end) => {
+    const lines = code.split('\n')
+    let currentLine = 0
+    let charCount = 0
+
+    // Find current line
+    for (let i = 0; i < lines.length; i++) {
+      if (charCount + lines[i].length >= start) {
+        currentLine = i
+        break
+      }
+      charCount += lines[i].length + 1
+    }
+
+    const indentSize = getIndentSize(selectedLanguage)
+    const indent = ' '.repeat(indentSize)
+
+    if (start === end) {
+      // Single cursor - add indentation at cursor position
+      const newCode = code.substring(0, start) + indent + code.substring(end)
+      setCode(newCode)
+      setTimeout(() => {
+        textarea.focus()
+        textarea.setSelectionRange(start + indent.length, start + indent.length)
+      }, 0)
+    } else {
+      // Selection - indent all selected lines
+      const selectedLines = []
+      let lineStart = 0
+      
+      for (let i = 0; i < lines.length; i++) {
+        const lineEnd = lineStart + lines[i].length
+        if (lineEnd >= start && lineStart <= end) {
+          selectedLines.push(i)
+        }
+        lineStart = lineEnd + 1
+      }
+
+      const newLines = [...lines]
+      selectedLines.forEach(lineIndex => {
+        newLines[lineIndex] = indent + newLines[lineIndex]
+      })
+
+      setCode(newLines.join('\n'))
+      setTimeout(() => {
+        textarea.focus()
+        textarea.setSelectionRange(start + indent.length, end + indent.length * selectedLines.length)
+      }, 0)
+    }
+  }
+
+  const handleReverseTab = (textarea, start, end) => {
+    const lines = code.split('\n')
+    let currentLine = 0
+    let charCount = 0
+
+    // Find current line
+    for (let i = 0; i < lines.length; i++) {
+      if (charCount + lines[i].length >= start) {
+        currentLine = i
+        break
+      }
+      charCount += lines[i].length + 1
+    }
+
+    const indentSize = getIndentSize(selectedLanguage)
+
+    if (start === end) {
+      // Single cursor - remove indentation at cursor position
+      const currentLineText = lines[currentLine]
+      const leadingSpaces = currentLineText.match(/^(\s*)/)[1]
+      const spacesToRemove = Math.min(leadingSpaces.length, indentSize)
+      
+      if (spacesToRemove > 0) {
+        const newCode = code.substring(0, start - spacesToRemove) + code.substring(start)
+        setCode(newCode)
+        setTimeout(() => {
+          textarea.focus()
+          textarea.setSelectionRange(start - spacesToRemove, start - spacesToRemove)
+        }, 0)
+      }
+    } else {
+      // Selection - unindent all selected lines
+      const selectedLines = []
+      let lineStart = 0
+      
+      for (let i = 0; i < lines.length; i++) {
+        const lineEnd = lineStart + lines[i].length
+        if (lineEnd >= start && lineStart <= end) {
+          selectedLines.push(i)
+        }
+        lineStart = lineEnd + 1
+      }
+
+      const newLines = [...lines]
+      let totalRemoved = 0
+      
+      selectedLines.forEach(lineIndex => {
+        const leadingSpaces = newLines[lineIndex].match(/^(\s*)/)[1]
+        const spacesToRemove = Math.min(leadingSpaces.length, indentSize)
+        newLines[lineIndex] = newLines[lineIndex].substring(spacesToRemove)
+        totalRemoved += spacesToRemove
+      })
+
+      setCode(newLines.join('\n'))
+      setTimeout(() => {
+        textarea.focus()
+        textarea.setSelectionRange(Math.max(0, start - indentSize), Math.max(0, end - totalRemoved))
+      }, 0)
+    }
+  }
+
+  const getIndentSize = (language) => {
+    const indentSizes = {
+      python: 4,
+      javascript: 2,
+      typescript: 2,
+      java: 4,
+      cpp: 4,
+      c: 4,
+      go: 4,
+      rust: 4,
+      kotlin: 4,
+      scala: 2,
+      swift: 4,
+      ruby: 2,
+      bash: 2,
+      sql: 2
+    }
+    return indentSizes[language] || 4
+  }
+
+  const tryTabCompletion = (word, language) => {
+    const keywords = getLanguageKeywords(language)
+    const matches = keywords.filter(keyword => 
+      keyword.toLowerCase().startsWith(word.toLowerCase()) && keyword.toLowerCase() !== word.toLowerCase()
+    )
+    
+    if (matches.length === 1) {
+      return matches[0]
+    } else if (matches.length > 1) {
+      // Find common prefix
+      const commonPrefix = findCommonPrefix(matches)
+      if (commonPrefix.length > word.length) {
+        return commonPrefix
+      }
+    }
+    
+    return null
+  }
+
+  const findCommonPrefix = (strings) => {
+    if (strings.length === 0) return ''
+    if (strings.length === 1) return strings[0]
+    
+    let prefix = strings[0]
+    for (let i = 1; i < strings.length; i++) {
+      while (prefix.length > 0 && !strings[i].toLowerCase().startsWith(prefix.toLowerCase())) {
+        prefix = prefix.slice(0, -1)
+      }
+    }
+    return prefix
+  }
 
   const fetchTestCases = async (problemId) => {
     try {
@@ -811,25 +1233,156 @@ export default function App() {
     fetchProblems()
   }, [])
 
-  // Keyboard shortcuts
+  // Comprehensive keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // Don't trigger shortcuts when typing in input fields
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.contentEditable === 'true') {
+        // Only handle shortcuts that should work in textarea
+        if (e.target.tagName === 'TEXTAREA') {
+          // Tab for indentation and completion
+          if (e.key === 'Tab') {
+            handleTabKey(e)
+            return
+          }
+          
+          // Ctrl/Cmd + / for comment/uncomment
+          if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+            e.preventDefault()
+            toggleComment()
+            return
+          }
+          
+          // Ctrl/Cmd + D for duplicate line
+          if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+            e.preventDefault()
+            duplicateLine()
+            return
+          }
+          
+          // Ctrl/Cmd + Shift + K for delete line
+          if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'K') {
+            e.preventDefault()
+            deleteLine()
+            return
+          }
+          
+          // Alt + Up/Down for move line
+          if (e.altKey && e.key === 'ArrowUp') {
+            e.preventDefault()
+            moveLineUp()
+            return
+          }
+          if (e.altKey && e.key === 'ArrowDown') {
+            e.preventDefault()
+            moveLineDown()
+            return
+          }
+          
+          // Ctrl/Cmd + Shift + F for format
+          if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
+            e.preventDefault()
+            formatCode()
+            return
+          }
+        }
+        return
+      }
+
+      // Global shortcuts (work anywhere)
+      
       // Ctrl/Cmd + Enter to run code
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault()
         if (selectedProblem && code.trim() && !isRunning) {
           runCode()
         }
+        return
       }
+      
+      // F5 to run code
+      if (e.key === 'F5') {
+        e.preventDefault()
+        if (selectedProblem && code.trim() && !isRunning) {
+          runCode()
+        }
+        return
+      }
+      
+      // Ctrl/Cmd + Shift + Enter to submit code
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'Enter') {
+        e.preventDefault()
+        if (selectedProblem && code.trim() && !isSubmittingCode) {
+          submitCode()
+        }
+        return
+      }
+      
       // Escape to go back to problems list
-      if (e.key === 'Escape' && selectedProblem) {
-        setSelectedProblem(null)
+      if (e.key === 'Escape') {
+        if (showShortcuts) {
+          setShowShortcuts(false)
+        } else if (selectedProblem) {
+          setSelectedProblem(null)
+        }
+        return
+      }
+      
+      // Ctrl/Cmd + K to clear code
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        clearCode()
+        return
+      }
+      
+      // Ctrl/Cmd + Shift + L to cycle language forward
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'L') {
+        e.preventDefault()
+        cycleLanguage(1)
+        return
+      }
+      
+      // Ctrl/Cmd + Shift + J to cycle language backward
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'J') {
+        e.preventDefault()
+        cycleLanguage(-1)
+        return
+      }
+      
+      // Ctrl/Cmd + Shift + D to toggle dark mode
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'D') {
+        e.preventDefault()
+        toggleDarkMode()
+        return
+      }
+      
+      // Ctrl/Cmd + Shift + ? to show shortcuts
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === '?') {
+        e.preventDefault()
+        showKeyboardShortcuts()
+        return
+      }
+      
+      // Ctrl/Cmd + 1-9 to switch to specific language (if available)
+      if ((e.ctrlKey || e.metaKey) && e.key >= '1' && e.key <= '9') {
+        e.preventDefault()
+        const languageIndex = parseInt(e.key) - 1
+        if (languageIndex < allSupportedLanguages.length) {
+          const newLanguage = allSupportedLanguages[languageIndex]
+          setSelectedLanguage(newLanguage)
+          if (selectedProblem && selectedProblem.Stub && selectedProblem.Stub[newLanguage]) {
+            setCode(selectedProblem.Stub[newLanguage])
+          } else {
+            setCode(getDefaultStubForLanguage(newLanguage))
+          }
+        }
+        return
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedProblem, code, isRunning])
+  }, [selectedProblem, code, isRunning, isSubmittingCode, selectedLanguage, showShortcuts, isDarkMode])
 
   useEffect(() => {
     if (!selectedProblem) return
@@ -982,13 +1535,6 @@ export default function App() {
     } finally {
       setIsRunning(false)
     }
-  }
-
-  const toggleDarkMode = () => {
-    const newDarkMode = !isDarkMode
-    setIsDarkMode(newDarkMode)
-    // Save dark mode preference to localStorage
-    localStorage.setItem('ceesarcode-dark-mode', JSON.stringify(newDarkMode))
   }
 
   const retryFetchProblems = () => {
@@ -2184,6 +2730,22 @@ export default function App() {
                       >
                         {isSubmittingCode ? 'Submitting...' : 'Submit Code'}
                       </button>
+                      <button
+                        onClick={() => setShowShortcuts(true)}
+                        style={{
+                          backgroundColor: theme.surface,
+                          color: theme.text,
+                          border: `1px solid ${theme.border}`,
+                          borderRadius: '4px',
+                          padding: '6px 12px',
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                          fontWeight: '500'
+                        }}
+                        title="Show keyboard shortcuts (Ctrl+Shift+?)"
+                      >
+                        ⌨️ Shortcuts
+                      </button>
                   </div>
                 </div>
                 <textarea
@@ -2635,6 +3197,245 @@ export default function App() {
           )}
         </main>
       </div>
+
+      {/* Keyboard Shortcuts Modal */}
+      {showShortcuts && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: theme.background,
+            border: `1px solid ${theme.border}`,
+            borderRadius: '12px',
+            padding: '24px',
+            maxWidth: '600px',
+            width: '90%',
+            maxHeight: '80vh',
+            overflow: 'auto',
+            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '20px',
+              borderBottom: `1px solid ${theme.border}`,
+              paddingBottom: '12px'
+            }}>
+              <h2 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>
+                ⌨️ Keyboard Shortcuts
+              </h2>
+              <button
+                onClick={() => setShowShortcuts(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '24px',
+                  color: theme.textSecondary,
+                  cursor: 'pointer',
+                  padding: '4px'
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              {/* Code Execution */}
+              <div>
+                <h3 style={{ color: theme.text, margin: '0 0 12px 0', fontSize: '16px' }}>
+                  🚀 Code Execution
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <ShortcutItem 
+                    keys={['Ctrl', 'Enter']} 
+                    description="Run code" 
+                    theme={theme} 
+                  />
+                  <ShortcutItem 
+                    keys={['F5']} 
+                    description="Run code" 
+                    theme={theme} 
+                  />
+                  <ShortcutItem 
+                    keys={['Ctrl', 'Shift', 'Enter']} 
+                    description="Submit code" 
+                    theme={theme} 
+                  />
+                </div>
+              </div>
+
+              {/* Code Editing */}
+              <div>
+                <h3 style={{ color: theme.text, margin: '0 0 12px 0', fontSize: '16px' }}>
+                  ✏️ Code Editing
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <ShortcutItem 
+                    keys={['Ctrl', '/']} 
+                    description="Comment/Uncomment" 
+                    theme={theme} 
+                  />
+                  <ShortcutItem 
+                    keys={['Ctrl', 'D']} 
+                    description="Duplicate line" 
+                    theme={theme} 
+                  />
+                  <ShortcutItem 
+                    keys={['Ctrl', 'Shift', 'K']} 
+                    description="Delete line" 
+                    theme={theme} 
+                  />
+                  <ShortcutItem 
+                    keys={['Alt', '↑']} 
+                    description="Move line up" 
+                    theme={theme} 
+                  />
+                  <ShortcutItem 
+                    keys={['Alt', '↓']} 
+                    description="Move line down" 
+                    theme={theme} 
+                  />
+                  <ShortcutItem 
+                    keys={['Ctrl', 'Shift', 'F']} 
+                    description="Format code" 
+                    theme={theme} 
+                  />
+                  <ShortcutItem 
+                    keys={['Tab']} 
+                    description="Smart indentation / Tab completion" 
+                    theme={theme} 
+                  />
+                  <ShortcutItem 
+                    keys={['Shift', 'Tab']} 
+                    description="Remove indentation" 
+                    theme={theme} 
+                  />
+                </div>
+              </div>
+
+              {/* Navigation */}
+              <div>
+                <h3 style={{ color: theme.text, margin: '0 0 12px 0', fontSize: '16px' }}>
+                  🧭 Navigation
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <ShortcutItem 
+                    keys={['Esc']} 
+                    description="Back to problems" 
+                    theme={theme} 
+                  />
+                  <ShortcutItem 
+                    keys={['Ctrl', 'Shift', 'L']} 
+                    description="Next language" 
+                    theme={theme} 
+                  />
+                  <ShortcutItem 
+                    keys={['Ctrl', 'Shift', 'J']} 
+                    description="Previous language" 
+                    theme={theme} 
+                  />
+                  <ShortcutItem 
+                    keys={['Ctrl', '1-9']} 
+                    description="Switch to language" 
+                    theme={theme} 
+                  />
+                </div>
+              </div>
+
+              {/* Utilities */}
+              <div>
+                <h3 style={{ color: theme.text, margin: '0 0 12px 0', fontSize: '16px' }}>
+                  🛠️ Utilities
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <ShortcutItem 
+                    keys={['Ctrl', 'K']} 
+                    description="Clear code" 
+                    theme={theme} 
+                  />
+                  <ShortcutItem 
+                    keys={['Ctrl', 'Shift', 'D']} 
+                    description="Toggle dark mode" 
+                    theme={theme} 
+                  />
+                  <ShortcutItem 
+                    keys={['Ctrl', 'Shift', '?']} 
+                    description="Show shortcuts" 
+                    theme={theme} 
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div style={{
+              marginTop: '20px',
+              padding: '12px',
+              backgroundColor: theme.surface,
+              borderRadius: '8px',
+              border: `1px solid ${theme.border}`
+            }}>
+              <p style={{ 
+                margin: 0, 
+                fontSize: '12px', 
+                color: theme.textSecondary,
+                textAlign: 'center'
+              }}>
+                💡 Tip: Press <kbd style={{
+                  backgroundColor: theme.surface,
+                  border: `1px solid ${theme.border}`,
+                  borderRadius: '3px',
+                  padding: '2px 6px',
+                  fontSize: '11px',
+                  fontFamily: 'monospace'
+                }}>Ctrl+Shift+?</kbd> anytime to see this help!
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
   </div>
   )
 }
+
+// Keyboard shortcut item component
+const ShortcutItem = ({ keys, description, theme }) => (
+  <div style={{
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '6px 0'
+  }}>
+    <span style={{ color: theme.text, fontSize: '14px' }}>{description}</span>
+    <div style={{ display: 'flex', gap: '4px' }}>
+      {keys.map((key, index) => (
+        <React.Fragment key={index}>
+          <kbd style={{
+            backgroundColor: theme.surface,
+            border: `1px solid ${theme.border}`,
+            borderRadius: '4px',
+            padding: '2px 6px',
+            fontSize: '11px',
+            fontFamily: 'monospace',
+            color: theme.text,
+            fontWeight: '500'
+          }}>
+            {key}
+          </kbd>
+          {index < keys.length - 1 && (
+            <span style={{ color: theme.textSecondary, fontSize: '12px' }}>+</span>
+          )}
+        </React.Fragment>
+      ))}
+    </div>
+  </div>
+)

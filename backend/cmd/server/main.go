@@ -39,7 +39,7 @@ func main() {
 	mux.HandleFunc("/api/submit", submit)
 	mux.HandleFunc("/api/problems/create", createProblem)
 	mux.HandleFunc("/api/upload", uploadFile)
-	mux.Handle("/", http.FileServer(http.Dir("../frontend/dist")))
+	mux.Handle("/", http.FileServer(http.Dir("dist")))
 	log.Fatal(http.ListenAndServe(":8080", mux))
 }
 
