@@ -1,0 +1,11 @@
+{
+  "ID": "search-engine-indexing",
+  "Title": "Search Engine Indexing",
+  "Statement": "Imagine you’re building a search engine specialized in indexing and searching meeting transcripts. You notice in your query logs that users sometimes enter queries that are semantically equivalent (meaning they have the same intent) but differ slightly in wording. For example, the queries “begin smart summary” and “start smart summary” produce different results, although we recognize these queries as equivalent.\n\nTo address this, you’re given a set of known synonym pairs. Your task is to determine whether given pairs of search queries are equivalent, taking into account the provided synonyms.\n\nInput\nYou are given two lists:\n\nSynonym pairs indicating interchangeable words:\nSYNONYMS = [\n    (\"begin\", \"start\"),\n    (\"summary\", \"overview\"),\n]\nQuery pairs to evaluate:\nQUERIES = [\n    (\"start smart summary\", \"begin smart summary\"),\n    (\"begin smart summary\", \"begin smart overview\"),\n    (\"begin smart summary\", \"summary start smart\"),\n    (\"begin smart summary\", \"begin smart summary stop\"),\n]\nTask\nWrite a function that, given the synonyms and the query pairs, returns a list of boolean values. Each boolean value indicates whether the corresponding pair of queries are equivalent (true) or not (false).\n\nQueries are considered equivalent if:\n\nThey contain the same words in the same order given that words can be substituted by their synonyms.\nExample Output\n[true, true, false, false]",
+  "Languages": [
+    "python"
+  ],
+  "Stub": {
+    "python": ""
+  }
+}

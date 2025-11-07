@@ -1,0 +1,15 @@
+{
+  "id": "canva-machine learning engineer-senior-canva-ml-engineer-q4",
+  "title": "Building a Feature Store for Machine Learning at Canva",
+  "statement": "Canva uses a variety of machine learning models across different products.  To improve feature engineering, model training, and online serving, we want to implement a feature store. Design a feature store architecture that addresses the following requirements:  1) Support for batch and real-time feature computation and storage. 2) Feature versioning and lineage tracking. 3) Efficient feature retrieval for training and inference. 4) Support for different data types (e.g., numerical, categorical, text). 5) Integration with existing data infrastructure (e.g., data lakes, data warehouses).  Discuss your choice of technologies (e.g., Feast, Tecton, Hopsworks) and how you would handle feature consistency between offline and online environments. Provide an example of how you would define and manage a feature related to user activity within the feature store. \n\nExample Input: User activity data (e.g., page views, design creations, template interactions).\n\nExpected Output: A detailed feature store architecture diagram, technology choices, and an example of feature definition and management.",
+  "languages": [
+    "python",
+    "java",
+    "cpp"
+  ],
+  "stub": {
+    "cpp": "class Solution {\npublic:\n    void buildFeatureStore() {\n        // Your code here\n    }\n};",
+    "java": "class Solution {\n    public void buildFeatureStore() {\n        // Your code here\n    }\n}",
+    "python": "def build_feature_store():\n    # Your code here\n    pass"
+  }
+}

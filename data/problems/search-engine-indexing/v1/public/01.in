@@ -1,0 +1,11 @@
+SYNONYMS = [
+    ("begin", "start"),
+    ("summary", "overview"),
+]
+Query pairs to evaluate:
+QUERIES = [
+    ("start smart summary", "begin smart summary"),
+    ("begin smart summary", "begin smart overview"),
+    ("begin smart summary", "summary start smart"),
+    ("begin smart summary", "begin smart summary stop"),
+]

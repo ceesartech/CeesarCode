@@ -1,0 +1,11 @@
+{
+  "ID": "streaming-median",
+  "Title": "Streaming Median",
+  "Statement": "Task. Design a data structure that supports add(x:int) and median()-\u003efloat for an unbounded stream.\n\nConstraints\n\nO(log n) per insert, O(1) median query using two heaps (low=max-heap, high=min-heap).\nHandle negatives, duplicates, and alternating even/odd counts.\nStdlib only (heapq).\nSignature\n\nclass MedianStream:\n    def add(self, x: int) -\u003e None: ...\n    def median(self) -\u003e float: ...",
+  "Languages": [
+    "python"
+  ],
+  "Stub": {
+    "python": ""
+  }
+}

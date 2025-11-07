@@ -1,0 +1,925 @@
+import React, { useEffect, useState } from 'react'
+
+const styles = {
+  light: {
+    primary: '#6B7280', // Grey
+    secondary: '#F9FAFB', // Off-white
+    accent: '#374151',
+    background: '#FFFFFF',
+    surface: '#F3F4F6',
+    text: '#111827',
+    textSecondary: '#6B7280',
+    border: '#E5E7EB',
+    success: '#10B981',
+    error: '#EF4444',
+    warning: '#F59E0B'
+  },
+  dark: {
+    primary: '#9CA3AF', // Light grey
+    secondary: '#1F2937', // Dark grey
+    accent: '#D1D5DB',
+    background: '#111827',
+    surface: '#374151',
+    text: '#F9FAFB',
+    textSecondary: '#9CA3AF',
+    border: '#4B5563',
+    success: '#34D399',
+    error: '#F87171',
+    warning: '#FBBF24'
+  }
+}
+
+const Editor = ({ value, onChange, theme, disabled }) => (
+  <textarea
+    value={value}
+    onChange={e => onChange(e.target.value)}
+    disabled={disabled}
+    style={{
+      width: '100%',
+      height: '300px',
+      fontFamily: 'Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+      fontSize: '14px',
+      padding: '12px',
+      border: `1px solid ${theme.border}`,
+      borderRadius: '8px',
+      backgroundColor: theme.surface,
+      color: theme.text,
+      resize: 'vertical',
+      outline: 'none'
+    }}
+    placeholder="Write your code here..."
+  />
+)
+
+const LoadingSpinner = ({ theme }) => (
+  <div style={{
+    display: 'inline-block',
+    width: '20px',
+    height: '20px',
+    border: `2px solid ${theme.border}`,
+    borderTop: `2px solid ${theme.primary}`,
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite'
+  }} />
+)
+
+const TestResult = ({ test, index, theme }) => {
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'AC': return theme.success
+      case 'WA': return theme.error
+      case 'TLE': return '#FFA500' // Orange
+      case 'RE': return theme.error
+      case 'IE': return theme.error
+      default: return theme.textSecondary
+    }
+  }
+
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'AC': return '✓ Accepted'
+      case 'WA': return '✗ Wrong Answer'
+      case 'TLE': return '⏱️ Time Limit'
+      case 'RE': return '⚠️ Runtime Error'
+      case 'IE': return '🔧 Internal Error'
+      default: return status
+    }
+  }
+
+  return (
+    <tr style={{
+      borderBottom: `1px solid ${theme.border}`,
+      backgroundColor: test.status === 'AC' ? `${theme.success}08` : 'transparent'
+    }}>
+      <td style={{ padding: '12px', color: theme.text, fontWeight: '500' }}>{test.name}</td>
+      <td style={{ padding: '12px' }}>
+        <span style={{
+          color: getStatusColor(test.status),
+          fontWeight: 'bold',
+          fontSize: '12px',
+          padding: '4px 8px',
+          borderRadius: '4px',
+          backgroundColor: `${getStatusColor(test.status)}15`,
+          border: `1px solid ${getStatusColor(test.status)}25`
+        }}>
+          {getStatusText(test.status)}
+        </span>
+      </td>
+      <td style={{
+        padding: '12px',
+        color: theme.textSecondary,
+        fontSize: '14px',
+        fontFamily: 'monospace'
+      }}>
+        {test.time_ms}ms
+      </td>
+      <td style={{
+        padding: '12px',
+        color: test.message ? theme.error : theme.success,
+        fontSize: '12px',
+        maxWidth: '300px',
+        wordWrap: 'break-word'
+      }}>
+        {test.message || '✓ Passed'}
+      </td>
+    </tr>
+  )
+}
+
+export default function App() {
+  const [problems, setProblems] = useState([])
+  const [selectedProblem, setSelectedProblem] = useState(null)
+  const [language, setLanguage] = useState('python')
+  const [code, setCode] = useState('')
+  const [result, setResult] = useState(null)
+  const [isDarkMode, setIsDarkMode] = useState(false)
+  const [isLoadingProblems, setIsLoadingProblems] = useState(true)
+  const [isLoadingProblem, setIsLoadingProblem] = useState(false)
+  const [isRunning, setIsRunning] = useState(false)
+  const [error, setError] = useState(null)
+  const [retryCount, setRetryCount] = useState(0)
+  const [isBackendConnected, setIsBackendConnected] = useState(true)
+  const [showCreateProblem, setShowCreateProblem] = useState(false)
+  const [newProblem, setNewProblem] = useState({
+    title: '',
+    statement: '',
+    languages: ['python'],
+    stub: { python: '' }
+  })
+  const [showTestCases, setShowTestCases] = useState(false)
+  const [testCases, setTestCases] = useState([])
+  const [editingTestCases, setEditingTestCases] = useState(false)
+  const [uploadedFiles, setUploadedFiles] = useState([])
+  const [isJupyterMode, setIsJupyterMode] = useState(false)
+  const [jupyterCells, setJupyterCells] = useState([
+    { id: 1, code: '', output: '', isRunning: false }
+  ])
+
+  // All supported languages
+  const allSupportedLanguages = [
+    'python', 'cpp', 'c', 'java', 'kotlin', 'scala', 'go', 'rust',
+    'swift', 'ruby', 'javascript', 'typescript', 'bash', 'sh', 'sql'
+  ]
+
+  const theme = isDarkMode ? styles.dark : styles.light
+
+  const fetchTestCases = async (problemId) => {
+    try {
+      const response = await fetch(`/api/problem/${problemId}/testcases`)
+      if (!response.ok) throw new Error('Failed to fetch test cases')
+
+      const testCasesData = await response.json()
+      setTestCases(testCasesData)
+      setShowTestCases(true) // Always show when fetching
+      setEditingTestCases(false)
+
+      // Update URL for browser navigation
+      const newUrl = `${window.location.pathname}#problem=${problemId}&view=testcases`
+      window.history.pushState({ problemId, view: 'testcases' }, '', newUrl)
+    } catch (err) {
+      console.error('Error fetching test cases:', err)
+      setError('Failed to load test cases')
+    }
+  }
+
+  // Handle browser back/forward navigation
+  useEffect(() => {
+    const handlePopState = (event) => {
+      if (event.state) {
+        const { problemId, view } = event.state
+        if (problemId && view === 'testcases') {
+          // Re-fetch test cases for the problem
+          const problem = problems.find(p => p.ID === problemId)
+          if (problem) {
+            setSelectedProblem(problem)
+            fetchTestCases(problemId)
+          }
+        } else if (problemId) {
+          // Just select the problem
+          const problem = problems.find(p => p.ID === problemId)
+          if (problem) {
+            setSelectedProblem(problem)
+            setShowTestCases(false)
+          }
+        } else {
+          // Go back to problem list
+          setSelectedProblem(null)
+          setShowTestCases(false)
+        }
+      }
+    }
+
+    window.addEventListener('popstate', handlePopState)
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [problems])
+
+  const saveTestCases = async (problemId) => {
+    try {
+      const response = await fetch(`/api/problem/${problemId}/testcases`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(testCases)
+      })
+
+      if (!response.ok) throw new Error('Failed to save test cases')
+
+      setEditingTestCases(false)
+      alert('Test cases saved successfully!')
+    } catch (err) {
+      console.error('Error saving test cases:', err)
+      alert('Failed to save test cases: ' + err.message)
+    }
+  }
+
+  const addTestCase = () => {
+    setTestCases([...testCases, { name: `Test ${testCases.length + 1}`, input: '', output: '' }])
+  }
+
+  const updateTestCase = (index, field, value) => {
+    const updated = [...testCases]
+    updated[index][field] = value
+    setTestCases(updated)
+  }
+
+  const removeTestCase = (index) => {
+    setTestCases(testCases.filter((_, i) => i !== index))
+  }
+
+  const handleFileUpload = async (event) => {
+    const files = Array.from(event.target.files)
+    const uploadedFilesData = []
+
+    for (const file of files) {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      try {
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData
+        })
+
+        if (response.ok) {
+          const result = await response.json()
+          uploadedFilesData.push({
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            url: result.url
+          })
+        }
+      } catch (err) {
+        console.error('Upload failed:', err)
+        alert(`Failed to upload ${file.name}`)
+      }
+    }
+
+    setUploadedFiles([...uploadedFiles, ...uploadedFilesData])
+    alert(`${uploadedFilesData.length} file(s) uploaded successfully!`)
+  }
+
+  const removeUploadedFile = (index) => {
+    setUploadedFiles(uploadedFiles.filter((_, i) => i !== index))
+  }
+
+  // Jupyter cell functions
+  const addJupyterCell = () => {
+    const newCell = {
+      id: Date.now(),
+      code: '',
+      output: '',
+      isRunning: false
+    }
+    setJupyterCells([...jupyterCells, newCell])
+  }
+
+  const updateJupyterCell = (id, code) => {
+    setJupyterCells(jupyterCells.map(cell =>
+      cell.id === id ? { ...cell, code } : cell
+    ))
+  }
+
+  const runJupyterCell = async (id) => {
+    const cell = jupyterCells.find(c => c.id === id)
+    if (!cell) return
+
+    // Update cell to show running state
+    setJupyterCells(jupyterCells.map(c =>
+      c.id === id ? { ...c, isRunning: true, output: '' } : c
+    ))
+
+    try {
+      const files = { 'Main.py': cell.code }
+
+      const response = await fetch('/api/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          problemId: selectedProblem?.ID || 'jupyter-cell',
+          language: 'python',
+          files: files
+        })
+      })
+
+      const result = await response.json()
+
+      if (result.verdict === 'Accepted') {
+        setJupyterCells(jupyterCells.map(c =>
+          c.id === id ? { ...c, isRunning: false, output: '✓ Cell executed successfully' } : c
+        ))
+      } else {
+        const errorMsg = result.tests?.[0]?.message || 'Execution failed'
+        setJupyterCells(jupyterCells.map(c =>
+          c.id === id ? { ...c, isRunning: false, output: `✗ ${errorMsg}` } : c
+        ))
+      }
+    } catch (err) {
+      setJupyterCells(jupyterCells.map(c =>
+        c.id === id ? { ...c, isRunning: false, output: `✗ Error: ${err.message}` } : c
+      ))
+    }
+  }
+
+  const deleteJupyterCell = (id) => {
+    if (jupyterCells.length > 1) {
+      setJupyterCells(jupyterCells.filter(cell => cell.id !== id))
+    }
+  }
+
+  // Handle initial URL hash for deep linking
+  useEffect(() => {
+    const handleInitialUrl = () => {
+      const hash = window.location.hash
+      if (hash.startsWith('#problem=')) {
+        const params = new URLSearchParams(hash.substring(1))
+        const problemId = params.get('problem')
+        const view = params.get('view')
+
+        // Wait for problems to load, then navigate
+        const checkProblems = () => {
+          if (problems.length > 0) {
+            const problem = problems.find(p => p.ID === problemId)
+            if (problem) {
+              setSelectedProblem(problem)
+              if (view === 'testcases') {
+                fetchTestCases(problemId)
+              }
+            }
+          } else {
+            setTimeout(checkProblems, 100)
+          }
+        }
+        checkProblems()
+      }
+    }
+
+    handleInitialUrl()
+  }, [problems])
+
+  useEffect(() => {
+    const fetchProblems = async (retryCount = 0) => {
+      try {
+        const response = await fetch('/api/problems')
+        if (!response.ok) throw new Error('Failed to fetch problems')
+        const data = await response.json()
+        setProblems(data)
+        setError(null)
+      } catch (err) {
+        console.error('Error fetching problems:', err)
+        setIsBackendConnected(false)
+        if (retryCount < 3) {
+          setTimeout(() => fetchProblems(retryCount + 1), 1000 * (retryCount + 1))
+        } else {
+          setError('Failed to load problems. Please check if the backend is running.')
+        }
+      } finally {
+        setIsLoadingProblems(false)
+      }
+    }
+    fetchProblems()
+  }, [])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Ctrl/Cmd + Enter to run code
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault()
+        if (selectedProblem && code.trim() && !isRunning) {
+          runCode()
+        }
+      }
+      // Escape to go back to problems list
+      if (e.key === 'Escape' && selectedProblem) {
+        setSelectedProblem(null)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedProblem, code, isRunning])
+
+  useEffect(() => {
+    if (!selectedProblem) return
+
+    const fetchProblemDetails = async () => {
+      setIsLoadingProblem(true)
+      try {
+        const response = await fetch(`/api/problem/${selectedProblem.ID}`)
+        if (!response.ok) throw new Error('Failed to fetch problem details')
+        const problem = await response.json()
+        setLanguage(problem.Languages[0] || 'python')
+        setCode((problem.Stub && problem.Stub[problem.Languages[0]]) || '')
+        setError(null)
+      } catch (err) {
+        setError('Failed to load problem details.')
+        console.error('Error fetching problem details:', err)
+      } finally {
+        setIsLoadingProblem(false)
+      }
+    }
+    fetchProblemDetails()
+  }, [selectedProblem])
+
+  const runCode = async () => {
+    if (!selectedProblem) return
+
+    setIsRunning(true)
+    setResult(null)
+    setError(null)
+
+    try {
+      const files = {}
+      if (language === 'python') files['Main.py'] = code
+      else if (language === 'cpp' || language === 'c') files['Main.cpp'] = code
+      else if (language === 'java') files['Main.java'] = code
+      else if (language === 'kotlin') files['Main.kt'] = code
+      else if (language === 'scala') files['Main.scala'] = code
+      else if (language === 'go') files['main.go'] = code
+      else if (language === 'rust') files['main.rs'] = code
+      else if (language === 'swift') files['main.swift'] = code
+      else if (language === 'ruby') files['main.rb'] = code
+      else if (language === 'javascript') files['main.js'] = code
+      else if (language === 'typescript') files['main.ts'] = code
+      else if (language === 'bash' || language === 'sh') files['script.sh'] = code
+      else files['code.txt'] = code
+
+      console.log('Submitting code:', {
+        problemId: selectedProblem.ID,
+        language: language,
+        files: files
+      })
+
+      const response = await fetch('/api/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          problemId: selectedProblem.ID,
+          language: language,
+          files: files
+        })
+      })
+
+      console.log('Response status:', response.status)
+      console.log('Response ok:', response.ok)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Response error:', errorText)
+        throw new Error(`Submission failed: ${response.status} ${errorText}`)
+      }
+
+      const data = await response.json()
+      console.log('Response data:', data)
+
+      // Validate response structure
+      if (!data || typeof data !== 'object') {
+        throw new Error('Invalid response format')
+      }
+
+      if (!data.verdict) {
+        throw new Error('Missing verdict in response')
+      }
+
+      setResult(data)
+    } catch (err) {
+      console.error('Error running code:', err)
+      setError(`Failed to run code: ${err.message}`)
+    } finally {
+      setIsRunning(false)
+    }
+  }
+
+  const toggleDarkMode = () => {
+    setIsDarkMode(!isDarkMode)
+  }
+
+  const retryFetchProblems = () => {
+    setIsLoadingProblems(true)
+    setError(null)
+    setRetryCount(0)
+    const fetchProblems = async (retryCount = 0) => {
+      try {
+        const response = await fetch('/api/problems')
+        if (!response.ok) throw new Error('Failed to fetch problems')
+        const data = await response.json()
+        setProblems(data)
+        setError(null)
+      } catch (err) {
+        console.error('Error fetching problems:', err)
+        if (retryCount < 3) {
+          setTimeout(() => fetchProblems(retryCount + 1), 1000 * (retryCount + 1))
+        } else {
+          setError('Failed to load problems. Please check if the backend is running.')
+        }
+      } finally {
+        setIsLoadingProblems(false)
+      }
+    }
+    fetchProblems()
+  }
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      backgroundColor: theme.background,
+      color: theme.text,
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+    }}>
+      <style>
+        {`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+          * { box-sizing: border-box; }
+          button:hover:not(:disabled) { opacity: 0.8; }
+          select:hover { opacity: 0.8; }
+          textarea:focus, select:focus, button:focus { outline: 2px solid ${theme.primary}; outline-offset: 2px; }
+        `}
+      </style>
+
+      <header style={{
+        backgroundColor: theme.secondary,
+        borderBottom: `1px solid ${theme.border}`,
+        padding: '12px 20px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        <h1 style={{
+          margin: 0,
+          color: theme.text,
+          fontSize: '24px',
+          fontWeight: 'bold'
+        }}>
+          CeesarCode
+        </h1>
+        <div style={{
+          fontSize: '12px',
+          color: theme.textSecondary,
+          marginTop: '4px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '4px'
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <div style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              backgroundColor: isBackendConnected ? theme.success : theme.error
+            }} />
+            <span>Backend: {isBackendConnected ? 'Connected' : 'Disconnected'}</span>
+  </div>
+          <div>Ctrl+Enter to run • Esc to go back</div>
+        </div>
+        <button
+          onClick={toggleDarkMode}
+          style={{
+            backgroundColor: theme.surface,
+            border: `1px solid ${theme.border}`,
+            borderRadius: '8px',
+            padding: '8px 16px',
+            color: theme.text,
+            cursor: 'pointer',
+            fontSize: '14px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          {isDarkMode ? '☀️ Light' : '🌙 Dark'}
+        </button>
+      </header>
+
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '280px 1fr',
+        height: 'calc(100vh - 73px)',
+        overflow: 'hidden'
+      }}>
+        <aside style={{
+          backgroundColor: theme.secondary,
+          borderRight: `1px solid ${theme.border}`,
+          padding: '20px',
+          overflowY: 'auto'
+        }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '16px'
+          }}>
+            <h3 style={{
+              margin: 0,
+              color: theme.text,
+              fontSize: '18px',
+              fontWeight: '600'
+            }}>
+              Problems
+            </h3>
+            <button
+              onClick={() => setShowCreateProblem(!showCreateProblem)}
+              style={{
+                backgroundColor: theme.primary,
+                color: '#FFFFFF',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '6px 12px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                fontWeight: '500'
+              }}
+            >
+              {showCreateProblem ? 'Cancel' : '+ Create'}
+            </button>
+          </div>
+
+          {isLoadingProblems ? (
+            <div style={{ textAlign: 'center', padding: '20px' }}>
+              <LoadingSpinner theme={theme} />
+              <p style={{ margin: '12px 0 0 0', color: theme.textSecondary }}>Loading problems...</p>
+            </div>
+          ) : error && !problems.length ? (
+            <div style={{
+              padding: '16px',
+              backgroundColor: theme.surface,
+              border: `1px solid ${theme.error}`,
+              borderRadius: '8px',
+              color: theme.error
+            }}>
+              <p style={{ margin: '0 0 12px 0' }}>{error}</p>
+              <button
+                onClick={retryFetchProblems}
+                style={{
+                  backgroundColor: theme.primary,
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '8px 16px',
+                  cursor: 'pointer',
+                  fontSize: '14px'
+                }}
+              >
+                Retry
+              </button>
+            </div>
+          ) : (
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+              {problems.map(problem => (
+                <li key={problem.ID} style={{ marginBottom: '8px' }}>
+                  <button
+                                          onClick={() => {
+                        setSelectedProblem(problem)
+                        setResult(null) // Clear results when switching problems
+                        setError(null) // Clear any errors too
+                        setShowTestCases(false) // Hide test cases when switching problems
+                        setEditingTestCases(false)
+
+                        // Update browser history
+                        const newUrl = `${window.location.pathname}#problem=${problem.ID}`
+                        window.history.pushState({ problemId: problem.ID }, '', newUrl)
+                      }}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      backgroundColor: selectedProblem?.ID === problem.ID ? theme.primary : theme.surface,
+                      color: selectedProblem?.ID === problem.ID ? '#FFFFFF' : theme.text,
+                      border: `1px solid ${theme.border}`,
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      fontSize: '14px',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <div style={{ fontWeight: '500' }}>{problem.Title}</div>
+                    <div style={{
+                      fontSize: '12px',
+                      opacity: 0.7,
+                      marginTop: '4px'
+                    }}>
+                      {problem.Languages?.length || 0} languages supported
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {showCreateProblem && (
+            <div style={{
+              marginTop: '20px',
+              padding: '16px',
+              backgroundColor: theme.surface,
+              border: `1px solid ${theme.border}`,
+              borderRadius: '8px'
+            }}>
+              <h4 style={{
+                margin: '0 0 16px 0',
+                color: theme.text,
+                fontSize: '16px',
+                fontWeight: '600'
+              }}>
+                Create New Problem
+              </h4>
+
+              <div style={{ marginBottom: '12px' }}>
+                <input
+                  type="text"
+                  placeholder="Problem Title"
+                  value={newProblem.title}
+                  onChange={(e) => setNewProblem({...newProblem, title: e.target.value})}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: '6px',
+                    backgroundColor: theme.background,
+                    color: theme.text,
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <textarea
+                  placeholder="Problem Statement"
+                  value={newProblem.statement}
+                  onChange={(e) => setNewProblem({...newProblem, statement: e.target.value})}
+                  rows={4}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: '6px',
+                    backgroundColor: theme.background,
+                    color: theme.text,
+                    fontSize: '14px',
+                    resize: 'vertical'
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <select
+                  multiple
+                  value={newProblem.languages}
+                  onChange={(e) => {
+                    const selected = Array.from(e.target.selectedOptions, option => option.value)
+                    setNewProblem({...newProblem, languages: selected})
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: '6px',
+                    backgroundColor: theme.background,
+                    color: theme.text,
+                    fontSize: '14px',
+                    height: '80px'
+                  }}
+                >
+                  {allSupportedLanguages.map(lang => (
+                    <option key={lang} value={lang}>
+                      {lang.charAt(0).toUpperCase() + lang.slice(1)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                onClick={async () => {
+                  if (!newProblem.title.trim() || !newProblem.statement.trim()) {
+                    alert('Please fill in title and statement')
+                    return
+                  }
+
+                  try {
+                    const response = await fetch('/api/problems/create', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(newProblem)
+                    })
+
+                    if (!response.ok) throw new Error('Failed to create problem')
+
+                    const result = await response.json()
+                    console.log('Problem created:', result)
+
+                    // Refresh problems list
+                    const fetchProblems = async () => {
+                      try {
+                        const response = await fetch('/api/problems')
+                        if (!response.ok) throw new Error('Failed to fetch problems')
+                        const data = await response.json()
+                        setProblems(data)
+                      } catch (err) {
+                        console.error('Error fetching problems:', err)
+                      }
+                    }
+                    fetchProblems()
+
+                    // Reset form
+                    setShowCreateProblem(false)
+                    setNewProblem({
+                      title: '',
+                      statement: '',
+                      languages: ['python'],
+                      stub: { python: '' }
+                    })
+                  } catch (err) {
+                    console.error('Error creating problem:', err)
+                    alert('Failed to create problem: ' + err.message)
+                  }
+                }}
+                style={{
+                  backgroundColor: theme.success,
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '8px 16px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500'
+                }}
+              >
+                Create Problem
+              </button>
+            </div>
+          )}
+        </aside>
+
+        <main style={{
+          padding: '20px',
+          overflowY: 'auto',
+          backgroundColor: theme.background
+        }}>
+          {error && selectedProblem && (
+            <div style={{
+              padding: '12px 16px',
+              backgroundColor: theme.surface,
+              border: `1px solid ${theme.error}`,
+              borderRadius: '8px',
+              color: theme.error,
+              marginBottom: '20px'
+            }}>
+              {error}
+            </div>
+          )}
+
+          {!selectedProblem ? (
+            <div style={{
+              textAlign: 'center',
+              padding: '60px 20px',
+              color: theme.textSecondary
+            }}>
+              <h2 style={{ margin: '0 0 16px 0', fontSize: '24px' }}>Welcome to CeesarCode</h2>
+              <p style={{ margin: 0, fontSize: '16px' }}>Select a problem from the sidebar to get started!</p>
+            </div>
+          ) : isLoadingProblem ? (
+            <div style={{ textAlign: 'center', padding: '40px' }}>
+              <LoadingSpinner theme={theme} />
+              <p style={{ margin: '12px 0 0 0', color: theme.textSecondary }}>Loading problem...</p>
+            </div>
+          ) : (
+            <div>
+              <h2>Problem Content</h2>
+            </div>
+          )}
+
+        </main>
+      </div>
+    </div>
+  </div>
+  )
+}
