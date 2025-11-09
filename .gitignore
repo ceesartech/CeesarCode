@@ -9,12 +9,15 @@
 # Go binaries
 /backend/main
 /backend/server
+/src/backend/main
+/src/backend/server
 /bin/
 /main
 /server
 
 # Rust build artifacts
 /executor-rs/target/
+/src/executor/target/
 /dist/release/
 
 # Frontend build artifacts
@@ -279,9 +282,9 @@ Cargo.lock
 
 # Keep sample-questions.json as it's documentation/example
 # Keep core infrastructure files
-!/Dockerfile
-!/docker-compose.yml
-!/build.sh
-!/build.bat
-!/go.mod
-!/main.go
+!/config/Dockerfile
+!/config/docker-compose.yml
+!/scripts/build.sh
+!/scripts/build.bat
+!/src/backend/go.mod
+!/src/backend/main.go

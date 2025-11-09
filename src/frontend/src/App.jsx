@@ -286,7 +286,9 @@ export default function App() {
     level: 'mid',
     count: 3,
     jobDescription: '',
-    companyDescription: ''
+    companyDescription: '',
+    provider: 'gemini', // 'gemini', 'openai', 'claude'
+    apiKey: '' // API key from UI (for production)
   })
   const [useCustomRole, setUseCustomRole] = useState(false)
   const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false)
@@ -320,63 +322,6 @@ export default function App() {
   const [isResizingPanes, setIsResizingPanes] = useState(false)
   const [isResizingConsole, setIsResizingConsole] = useState(false)
   
-  // Ref for code textarea to handle auto-resize
-  const codeTextareaRef = React.useRef(null)
-
-  // Auto-resize textarea to fit content (for shared scroll container)
-  useEffect(() => {
-    const updateEditorHeight = () => {
-      if (codeTextareaRef.current) {
-        const textarea = codeTextareaRef.current
-        const scrollContainer = textarea.parentElement.parentElement
-        const lineNumbersDiv = textarea.previousElementSibling
-        
-        if (scrollContainer && lineNumbersDiv) {
-          // Reset height to auto to get accurate scrollHeight (accounts for wrapped text)
-          textarea.style.height = 'auto'
-          lineNumbersDiv.style.height = 'auto'
-          
-          // Force a reflow to ensure accurate scrollHeight calculation
-          void textarea.offsetHeight
-          
-          // Get the actual content height needed (includes wrapped lines)
-          const contentHeight = textarea.scrollHeight
-          const containerHeight = scrollContainer.clientHeight
-          
-          // Set textarea height to show all content
-          // Ensure it's at least as tall as the container for proper scrolling
-          const finalHeight = Math.max(contentHeight, containerHeight)
-          textarea.style.height = finalHeight + 'px'
-          
-          // Match line numbers div height exactly
-          lineNumbersDiv.style.height = finalHeight + 'px'
-        }
-      }
-    }
-    
-    // Update immediately
-    updateEditorHeight()
-    
-    // Also update after a short delay to account for any layout changes
-    const timeoutId = setTimeout(updateEditorHeight, 50)
-    
-    // Add resize observer to handle window/container size changes
-    const resizeObserver = new ResizeObserver(() => {
-      updateEditorHeight()
-    })
-    
-    if (codeTextareaRef.current) {
-      const scrollContainer = codeTextareaRef.current.parentElement?.parentElement
-      if (scrollContainer) {
-        resizeObserver.observe(scrollContainer)
-      }
-    }
-    
-    return () => {
-      clearTimeout(timeoutId)
-      resizeObserver.disconnect()
-    }
-  }, [code, consoleCollapsed, consoleHeight])
 
   // All supported languages
   const allSupportedLanguages = [
@@ -785,10 +730,15 @@ export default function App() {
     // Ensure count is valid
     const count = agentRequest.count && !isNaN(parseInt(agentRequest.count)) ? parseInt(agentRequest.count) : 3
     const requestData = {
-      ...agentRequest,
+      company: agentRequest.company,
       role: role, // Use the selected or custom role
-      count: Math.max(1, Math.min(10, count))
+      level: agentRequest.level,
+      count: Math.max(1, Math.min(10, count)),
+      provider: agentRequest.provider || 'gemini',
+      apiKey: agentRequest.apiKey || '' // Send API key if provided
     }
+    
+    console.log('Sending request:', { ...requestData, apiKey: requestData.apiKey ? '***' + requestData.apiKey.slice(-4) : 'empty' })
 
     setIsGeneratingQuestions(true)
     setAgentResult(null)
@@ -803,11 +753,12 @@ export default function App() {
         body: JSON.stringify(requestData)
       })
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
       const result = await response.json()
+      
+      if (!response.ok) {
+        console.error('API error response:', result)
+        throw new Error(result.message || `HTTP error! status: ${response.status}`)
+      }
       setAgentResult(result)
 
       if (result.status === 'success') {
@@ -826,7 +777,8 @@ export default function App() {
         const problemCount = result.problems ? result.problems.length : 0
         alert(`Successfully generated ${problemCount} questions!`)
       } else {
-        alert(`Error: ${result.message}`)
+        console.error('AI generation error:', result)
+        alert(`Error: ${result.message || 'Failed to generate questions. Please check your API key and try again.'}`)
       }
     } catch (err) {
       console.error('Error generating questions:', err)
@@ -1477,16 +1429,26 @@ export default function App() {
       }
     }
     
-    // Check if next character is already the closing character
+    // Check if next character is already the closing character (smart bracket closing)
     const afterCursor = code.substring(end)
     if (afterCursor.charAt(0) === closingChar) {
       // Just move cursor past the existing closing character
       e.preventDefault()
-      const newCode = code.substring(0, start) + e.key + code.substring(end)
-      setCode(newCode)
       setTimeout(() => {
         textarea.focus()
-        textarea.setSelectionRange(start + 1, start + 1)
+        textarea.setSelectionRange(end + 1, end + 1)
+      }, 0)
+      return
+    }
+    
+    // Check if user is trying to type a closing bracket and there's already one there
+    const closingBrackets = { ')': '(', ']': '[', '}': '{' }
+    if (closingBrackets[e.key] && afterCursor.charAt(0) === e.key) {
+      // Skip over the existing closing bracket
+      e.preventDefault()
+      setTimeout(() => {
+        textarea.focus()
+        textarea.setSelectionRange(end + 1, end + 1)
       }, 0)
       return
     }
@@ -1503,17 +1465,109 @@ export default function App() {
     }, 0)
   }
 
+  // Extract variables and imports from code
+  const extractCodeSymbols = (codeText, language) => {
+    const symbols = {
+      variables: new Set(),
+      imports: new Set(),
+      functions: new Set()
+    }
+    
+    const lines = codeText.split('\n')
+    
+    for (const line of lines) {
+      const trimmed = line.trim()
+      
+      // Extract imports
+      if (language === 'python') {
+        const importMatch = trimmed.match(/^(?:from\s+(\S+)|import\s+(\S+))/)
+        if (importMatch) {
+          const module = importMatch[1] || importMatch[2]
+          if (module) {
+            // Extract individual imports
+            module.split(',').forEach(m => {
+              const name = m.trim().split(' as ')[0].split('.')[0]
+              symbols.imports.add(name)
+            })
+          }
+        }
+      } else if (['javascript', 'typescript'].includes(language)) {
+        const importMatch = trimmed.match(/import\s+(?:\{[^}]+\}|\*\s+as\s+(\w+)|(\w+))/)
+        if (importMatch) {
+          const name = importMatch[1] || importMatch[2]
+          if (name) symbols.imports.add(name)
+          // Also extract named imports
+          const namedMatch = trimmed.match(/import\s+\{([^}]+)\}/)
+          if (namedMatch) {
+            namedMatch[1].split(',').forEach(n => {
+              const name = n.trim().split(' as ')[0]
+              symbols.imports.add(name)
+            })
+          }
+        }
+      }
+      
+      // Extract variables (simple patterns)
+      const varPatterns = {
+        python: /^\s*(?:self\.)?(\w+)\s*=/,
+        javascript: /^\s*(?:const|let|var)\s+(\w+)\s*=/,
+        typescript: /^\s*(?:const|let|var)\s+(\w+)\s*[:=]/,
+        java: /^\s*(?:\w+\s+)?(\w+)\s*=/,
+        cpp: /^\s*(?:\w+\s+)?(\w+)\s*=/,
+        c: /^\s*(?:\w+\s+)?(\w+)\s*=/
+      }
+      
+      const varPattern = varPatterns[language]
+      if (varPattern) {
+        const varMatch = trimmed.match(varPattern)
+        if (varMatch) {
+          symbols.variables.add(varMatch[1])
+        }
+      }
+      
+      // Extract function names
+      const funcPatterns = {
+        python: /^\s*def\s+(\w+)/,
+        javascript: /^\s*(?:function\s+(\w+)|const\s+(\w+)\s*=\s*(?:\(|async\s*\())/,
+        typescript: /^\s*(?:function\s+(\w+)|const\s+(\w+)\s*[:=]\s*(?:\(|async\s*\())/,
+        java: /^\s*(?:\w+\s+)*\w+\s+(\w+)\s*\(/,
+        cpp: /^\s*(?:\w+\s+)*\w+\s+(\w+)\s*\(/,
+        c: /^\s*(?:\w+\s+)*\w+\s+(\w+)\s*\(/
+      }
+      
+      const funcPattern = funcPatterns[language]
+      if (funcPattern) {
+        const funcMatch = trimmed.match(funcPattern)
+        if (funcMatch) {
+          const funcName = funcMatch[1] || funcMatch[2]
+          if (funcName) symbols.functions.add(funcName)
+        }
+      }
+    }
+    
+    return symbols
+  }
+
   const tryTabCompletion = (word, language) => {
     const keywords = getLanguageKeywords(language)
-    const matches = keywords.filter(keyword => 
+    const keywordMatches = keywords.filter(keyword => 
       keyword.toLowerCase().startsWith(word.toLowerCase()) && keyword.toLowerCase() !== word.toLowerCase()
     )
     
-    if (matches.length === 1) {
-      return matches[0]
-    } else if (matches.length > 1) {
+    // Also check variables and imports
+    const symbols = extractCodeSymbols(code, language)
+    const allSymbols = [...symbols.variables, ...symbols.imports, ...symbols.functions]
+    const symbolMatches = allSymbols.filter(symbol => 
+      symbol.toLowerCase().startsWith(word.toLowerCase()) && symbol.toLowerCase() !== word.toLowerCase()
+    )
+    
+    const allMatches = [...keywordMatches, ...symbolMatches]
+    
+    if (allMatches.length === 1) {
+      return allMatches[0]
+    } else if (allMatches.length > 1) {
       // Find common prefix
-      const commonPrefix = findCommonPrefix(matches)
+      const commonPrefix = findCommonPrefix(allMatches)
       if (commonPrefix.length > word.length) {
         return commonPrefix
       }
@@ -3030,6 +3084,82 @@ export default function App() {
                   fontSize: '14px',
                   fontWeight: '600'
                 }}>
+                  AI Provider
+                </label>
+                <select
+                  value={agentRequest.provider}
+                  onChange={(e) => setAgentRequest({...agentRequest, provider: e.target.value, apiKey: ''})}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: '8px',
+                    backgroundColor: theme.background,
+                    color: theme.text,
+                    fontSize: '14px',
+                    transition: 'border-color 0.2s ease',
+                    cursor: 'pointer'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = theme.primary}
+                  onBlur={(e) => e.target.style.borderColor = theme.border}
+                >
+                  <option value="gemini">Google Gemini</option>
+                  <option value="openai">OpenAI (GPT-4o-mini)</option>
+                  <option value="claude">Anthropic Claude</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '8px',
+                  color: theme.text,
+                  fontSize: '14px',
+                  fontWeight: '600'
+                }}>
+                  API Key {agentRequest.provider === 'gemini' ? '(Optional - uses env var if not provided)' : '(Required)'}
+                </label>
+                <input
+                  type="password"
+                  value={agentRequest.apiKey}
+                  onChange={(e) => setAgentRequest({...agentRequest, apiKey: e.target.value})}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: '8px',
+                    backgroundColor: theme.background,
+                    color: theme.text,
+                    fontSize: '14px',
+                    transition: 'border-color 0.2s ease'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = theme.primary}
+                  onBlur={(e) => e.target.style.borderColor = theme.border}
+                  placeholder={`Enter your ${agentRequest.provider === 'gemini' ? 'Gemini' : agentRequest.provider === 'openai' ? 'OpenAI' : 'Claude'} API key...`}
+                />
+                <p style={{
+                  margin: '8px 0 0 0',
+                  color: theme.textSecondary,
+                  fontSize: '12px',
+                  lineHeight: '1.4'
+                }}>
+                  {agentRequest.provider === 'gemini' && 'Get your key from '}
+                  {agentRequest.provider === 'openai' && 'Get your key from '}
+                  {agentRequest.provider === 'claude' && 'Get your key from '}
+                  {agentRequest.provider === 'gemini' && <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style={{ color: theme.primary }}>Google AI Studio</a>}
+                  {agentRequest.provider === 'openai' && <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" style={{ color: theme.primary }}>OpenAI Platform</a>}
+                  {agentRequest.provider === 'claude' && <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer" style={{ color: theme.primary }}>Anthropic Console</a>}
+                </p>
+              </div>
+
+              <div>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '8px',
+                  color: theme.text,
+                  fontSize: '14px',
+                  fontWeight: '600'
+                }}>
                   Job Description (Optional)
                 </label>
                 <textarea
@@ -3164,18 +3294,18 @@ export default function App() {
               </button>
               <button
                 onClick={generateQuestions}
-                disabled={isGeneratingQuestions || !agentRequest.company || !agentRequest.role}
+                disabled={isGeneratingQuestions || !agentRequest.company || (useCustomRole ? !agentRequest.customRole : !agentRequest.role)}
                 style={{
                   flex: 1,
-                  backgroundColor: isGeneratingQuestions || !agentRequest.company || !agentRequest.role ? theme.border : theme.accent,
+                  backgroundColor: isGeneratingQuestions || !agentRequest.company || (useCustomRole ? !agentRequest.customRole : !agentRequest.role) ? theme.border : theme.accent,
                   color: '#FFFFFF',
                   border: 'none',
                   borderRadius: '6px',
                   padding: '10px',
                   fontSize: '14px',
-                  cursor: isGeneratingQuestions || !agentRequest.company || !agentRequest.role ? 'not-allowed' : 'pointer',
+                  cursor: isGeneratingQuestions || !agentRequest.company || (useCustomRole ? !agentRequest.customRole : !agentRequest.role) ? 'not-allowed' : 'pointer',
                   fontWeight: '500',
-                  opacity: isGeneratingQuestions || !agentRequest.company || !agentRequest.role ? 0.6 : 1
+                  opacity: isGeneratingQuestions || !agentRequest.company || (useCustomRole ? !agentRequest.customRole : !agentRequest.role) ? 0.6 : 1
                 }}
               >
                 {isGeneratingQuestions ? 'Generating...' : <><span style={{ marginRight: '6px' }}>⚡</span>Generate Questions</>}
@@ -3252,35 +3382,41 @@ export default function App() {
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
                   onClick={async () => {
+                    if (!window.confirm('This will remove ALL questions, including default and sample questions. Are you sure?')) {
+                      return
+                    }
+                    
                     setIsLoadingProblems(true)
                     try {
-                      // First clean AI problems, then refresh
-                      const cleanResponse = await fetch('/api/agent/clean', {
+                      const response = await fetch('/api/problems/clear', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' }
                       })
                       
-                      if (cleanResponse.ok) {
-                        const cleanResult = await cleanResponse.json()
-                        if (cleanResult.count > 0) {
-                          console.log(`Cleaned ${cleanResult.count} AI-generated problems`)
-                        }
+                      if (!response.ok) {
+                        const errorText = await response.text()
+                        throw new Error(`HTTP ${response.status}: ${errorText || 'Failed to clear all problems'}`)
                       }
                       
-                      // Then refresh the problems list
-                      const response = await fetch('/api/problems')
-                      if (!response.ok) throw new Error('Failed to fetch problems')
-                      const data = await response.json()
+                      const result = await response.json()
+                      alert(result.message || `Cleared ${result.count || 0} problems`)
+                      
+                      // Refresh the problems list (should be empty now)
+                      const refreshResponse = await fetch('/api/problems')
+                      if (refreshResponse.ok) {
+                        const data = await refreshResponse.json()
                       setProblems(data || [])
+                        setSelectedProblem(null)
+                      }
                     } catch (err) {
-                      console.error('Error refreshing problems:', err)
-                      alert('Failed to refresh problems: ' + err.message)
+                      console.error('Error clearing all problems:', err)
+                      alert('Failed to clear all problems: ' + (err.message || 'Unknown error'))
                     } finally {
                       setIsLoadingProblems(false)
                     }
                   }}
                   style={{
-                    backgroundColor: theme.primary,
+                    backgroundColor: theme.error,
                     color: '#FFFFFF',
                     border: 'none',
                     borderRadius: '6px',
@@ -3295,7 +3431,7 @@ export default function App() {
                   onMouseEnter={(e) => e.target.style.opacity = '0.9'}
                   onMouseLeave={(e) => e.target.style.opacity = '1'}
                 >
-                  <span style={{ marginRight: '4px' }}>↻</span>Refresh
+                  <span style={{ marginRight: '4px' }}>🗑</span>Clear All
                 </button>
                 <button
                   onClick={async () => {
@@ -3433,7 +3569,7 @@ export default function App() {
                             : theme.surface,
                           borderRadius: '12px',
                           fontSize: '11px'
-                        }}>
+                      }}>
                           {problemLanguages.length || 0} {problemLanguages.length === 1 ? 'language' : 'languages'}
                         </span>
                       </div>
@@ -3713,8 +3849,8 @@ export default function App() {
                             cursor: 'pointer',
                             minWidth: '100px',
                             fontFamily: 'inherit'
-                          }}
-                        >
+                            }}
+                          >
                           <option value="python">Python</option>
                           <option value="cpp">C++</option>
                           <option value="c">C</option>
@@ -3746,8 +3882,8 @@ export default function App() {
                             display: 'flex',
                             alignItems: 'center',
                             gap: '4px'
-                          }}
-                        >
+                            }}
+                          >
                           {isRunning ? 'Running...' : <><span>▶</span>Run</>}
                           </button>
                           <button
@@ -3766,8 +3902,8 @@ export default function App() {
                             display: 'flex',
                             alignItems: 'center',
                             gap: '4px'
-                          }}
-                        >
+                        }}
+                      >
                           {isSubmittingCode ? 'Submitting...' : <><span>✓</span>Submit</>}
                       </button>
                     </div>
@@ -3776,117 +3912,36 @@ export default function App() {
                       position: 'relative', 
                       flex: 1, 
                       minHeight: 0,
-                      overflow: 'hidden',
-                      display: 'flex',
-                      flexDirection: 'column',
+                              overflow: 'auto',
                       backgroundColor: theme.codeBackground
                     }}>
-                      {/* Code Editor with Embedded Line Numbers - Single Scroll Container */}
-                      <div style={{
-                        position: 'relative',
-                        flex: 1,
-                        minHeight: 0,
-                              overflow: 'auto',
-                        backgroundColor: theme.codeBackground
-                      }}>
-                        {/* Content wrapper that contains both line numbers and textarea */}
-                        <div style={{
-                          display: 'flex',
-                          minHeight: '100%',
-                          position: 'relative',
-                          width: '100%',
-                          alignItems: 'flex-start'
-                        }}>
-                          {/* Line Numbers - part of scrollable content */}
-                          <div 
-                            id="line-numbers-container"
-                            style={{
-                              width: '50px',
-                              flexShrink: 0,
-                              padding: '16px 8px 16px 16px',
-                              backgroundColor: isDarkMode ? '#1E1E1E' : '#F8F8F8',
-                              borderRight: `1px solid ${theme.border}`,
-                              color: isDarkMode ? '#858585' : '#999',
-                              fontFamily: '"SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, monospace',
-                              fontSize: '14px',
-                              lineHeight: '1.6',
-                              textAlign: 'right',
-                              userSelect: 'none',
-                              minHeight: '100%',
-                              height: 'auto'
-                            }}>
-                            {code.split('\n').map((_, index) => (
-                              <div key={index} style={{
-                                height: '1.6em',
-                                paddingRight: '8px'
-                              }}>
-                                {index + 1}
-                          </div>
-                            ))}
-                          </div>
-                          {/* Code Textarea - part of scrollable content */}
                             <textarea
-                            ref={codeTextareaRef}
-                            value={code}
-                            onChange={(e) => {
-                              setCode(e.target.value)
-                              // Height will be updated by useEffect
-                            }}
-                            onKeyDown={(e) => {
-                              handleKeyDown(e)
-                              // Height will be updated by useEffect after state change
-                            }}
-                            onInput={(e) => {
-                              // Update height immediately on input for better responsiveness
-                              const textarea = e.target
-                              const scrollContainer = textarea.parentElement.parentElement
-                              const lineNumbersDiv = textarea.previousElementSibling
-                              
-                              if (scrollContainer && lineNumbersDiv) {
-                                // Reset heights
-                                textarea.style.height = 'auto'
-                                lineNumbersDiv.style.height = 'auto'
-                                
-                                // Force reflow for accurate scrollHeight
-                                void textarea.offsetHeight
-                                
-                                // Calculate heights
-                                const contentHeight = textarea.scrollHeight
-                                const containerHeight = scrollContainer.clientHeight
-                                const finalHeight = Math.max(contentHeight, containerHeight)
-                                
-                                // Apply heights
-                                textarea.style.height = finalHeight + 'px'
-                                lineNumbersDiv.style.height = finalHeight + 'px'
-                              }
-                            }}
-                            style={{
-                              flex: 1,
-                              width: '100%',
-                              minHeight: '100%',
-                              padding: '16px',
-                              border: 'none',
-                              backgroundColor: 'transparent',
-                              color: theme.text,
-                              fontFamily: '"SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Liberation Mono", "Courier New", monospace',
-                              fontSize: '14px',
-                              lineHeight: '1.6',
-                              resize: 'none',
-                              outline: 'none',
-                              tabSize: 2,
-                              overflow: 'hidden',
-                              boxSizing: 'border-box',
-                              margin: 0,
-                              whiteSpace: 'pre-wrap',
-                              wordWrap: 'break-word',
-                              overflowWrap: 'break-word',
-                              height: 'auto'
-                            }}
-                            placeholder="Write your code here..."
-                          />
+                        value={code}
+                        onChange={(e) => setCode(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                              style={{
+                                width: '100%',
+                          height: '100%',
+                          minHeight: '100%',
+                          padding: '16px',
+                          border: 'none',
+                          backgroundColor: theme.codeBackground,
+                                color: theme.text,
+                          fontFamily: '"SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Liberation Mono", "Courier New", monospace',
+                          fontSize: '14px',
+                          lineHeight: '1.6',
+                          resize: 'none',
+                          outline: 'none',
+                          tabSize: 2,
+                          boxSizing: 'border-box',
+                          margin: 0,
+                          whiteSpace: 'pre-wrap',
+                          wordWrap: 'break-word',
+                          overflowWrap: 'break-word'
+                        }}
+                        placeholder="Write your code here..."
+                      />
                         </div>
-                      </div>
-                    </div>
 
                     {/* Console Output Section */}
                     {consoleCollapsed ? (
@@ -3904,7 +3959,7 @@ export default function App() {
                         position: 'relative',
                         zIndex: 5,
                         boxShadow: '0 -2px 8px rgba(0,0,0,0.1)'
-                      }}
+                          }}
                       onClick={toggleConsole}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.backgroundColor = isDarkMode ? '#2D2D30' : '#1F2329'
@@ -3920,14 +3975,14 @@ export default function App() {
                     display: 'flex',
                     alignItems: 'center',
                           gap: '10px'
-                        }}>
+                  }}>
                           <span style={{
                             fontSize: '13px',
                             fontWeight: '600',
                             color: isDarkMode ? '#CCCCCC' : '#C9D1D9',
                             textTransform: 'uppercase',
                             letterSpacing: '0.5px'
-                          }}>
+                  }}>
                             Output
                           </span>
                           <span style={{
@@ -3935,7 +3990,7 @@ export default function App() {
                             color: isDarkMode ? '#999' : '#888',
                             fontStyle: 'italic',
                             fontWeight: 'normal'
-                          }}>
+                      }}>
                             (Collapsed - Click to expand)
                           </span>
                         </div>
@@ -3958,7 +4013,7 @@ export default function App() {
                               overflow: 'hidden',
                         flexShrink: 0,
                         position: 'relative'
-                      }}>
+                            }}>
                         {/* Resize Handle at Top */}
                         <div
                           onMouseDown={(e) => {
@@ -4006,7 +4061,7 @@ export default function App() {
                               color: isDarkMode ? '#CCCCCC' : '#C9D1D9',
                               textTransform: 'uppercase',
                               letterSpacing: '0.5px'
-                            }}>
+                    }}>
                               Output
                             </span>
                             {isRunning && (
@@ -4016,7 +4071,7 @@ export default function App() {
                     display: 'flex',
                     alignItems: 'center',
                                 gap: '4px'
-                              }}>
+                  }}>
                                 <LoadingSpinner theme={theme} />
                                 Running...
                               </span>

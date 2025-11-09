@@ -100,33 +100,104 @@ main() {
     kill_port 8080
     kill_port 5173
     
-    # Load AI API key - check command line argument first, then .env file
+    # Load AI API key and provider - check command line arguments first, then .env file
+    AI_PROVIDER="gemini"
     GEMINI_API_KEY=""
-    if [ -n "$1" ]; then
-        GEMINI_API_KEY="$1"
-        print_success "AI Agent enabled with Gemini API key from command line argument"
-    elif [ -f ".env" ]; then
-        print_status "Loading AI API key from .env file..."
+    OPENAI_API_KEY=""
+    ANTHROPIC_API_KEY=""
+    
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -p|--provider)
+                AI_PROVIDER="$2"
+                shift 2
+                ;;
+            -k|--api-key)
+                case "$AI_PROVIDER" in
+                    gemini) GEMINI_API_KEY="$2" ;;
+                    openai) OPENAI_API_KEY="$2" ;;
+                    claude) ANTHROPIC_API_KEY="$2" ;;
+                esac
+                shift 2
+                ;;
+            *)
+                # Legacy: treat first positional arg as Gemini API key
+                if [ -z "$GEMINI_API_KEY" ] && [[ "$1" =~ ^AIza ]]; then
+                    GEMINI_API_KEY="$1"
+                    shift
+                else
+                    shift
+                fi
+                ;;
+        esac
+    done
+    
+    # Fallback to .env file if not provided via command line
+    if [ -f ".env" ]; then
+        print_status "Loading AI API keys from .env file..."
+        # Save current values before sourcing
+        OLD_GEMINI="$GEMINI_API_KEY"
+        OLD_OPENAI="$OPENAI_API_KEY"
+        OLD_ANTHROPIC="$ANTHROPIC_API_KEY"
         source .env
-        if [ -n "$GEMINI_API_KEY" ]; then
-            print_success "AI Agent enabled with Gemini API key from .env file"
-        else
-            print_warning "GEMINI_API_KEY not found in .env file - AI Agent will use fallback templates"
+        # Restore command-line values if they were set, otherwise use .env values
+        if [ -n "$OLD_GEMINI" ]; then
+            GEMINI_API_KEY="$OLD_GEMINI"
         fi
-    else
-        print_warning ".env file not found - AI Agent will use fallback templates"
-        print_status "Usage: $0 [GEMINI_API_KEY]"
-        print_status "  Or run './setup-ai.sh' to set up AI generation"
+        if [ -n "$OLD_OPENAI" ]; then
+            OPENAI_API_KEY="$OLD_OPENAI"
+        fi
+        if [ -n "$OLD_ANTHROPIC" ]; then
+            ANTHROPIC_API_KEY="$OLD_ANTHROPIC"
+        fi
     fi
+    
+    # Set appropriate API key based on provider
+    case "$AI_PROVIDER" in
+        gemini)
+            if [ -n "$GEMINI_API_KEY" ]; then
+                print_success "AI Agent enabled with Gemini API key"
+                export GEMINI_API_KEY
+            else
+                print_warning "GEMINI_API_KEY not found - AI Agent will use fallback templates"
+            fi
+            ;;
+        openai)
+            if [ -n "$OPENAI_API_KEY" ]; then
+                print_success "AI Agent enabled with OpenAI API key"
+                export OPENAI_API_KEY
+            else
+                print_warning "OPENAI_API_KEY not found - AI Agent will use fallback templates"
+            fi
+            ;;
+        claude)
+            if [ -n "$ANTHROPIC_API_KEY" ]; then
+                print_success "AI Agent enabled with Claude API key"
+                export ANTHROPIC_API_KEY
+            else
+                print_warning "ANTHROPIC_API_KEY not found - AI Agent will use fallback templates"
+            fi
+            ;;
+    esac
+    
+    print_status "Usage: $0 [-p|--provider gemini|openai|claude] [-k|--api-key KEY]"
+    print_status "  Or run './scripts/setup-ai.sh' to set up AI generation"
     
     # Start backend
     print_status "Starting Go backend server..."
     cd src/backend
+    # Export all API keys (backend will choose based on request)
     if [ -n "$GEMINI_API_KEY" ]; then
-        env GEMINI_API_KEY="$GEMINI_API_KEY" go run main.go > ../../logs/backend.log 2>&1 &
-    else
-        go run main.go > ../../logs/backend.log 2>&1 &
+        export GEMINI_API_KEY
     fi
+    if [ -n "$OPENAI_API_KEY" ]; then
+        export OPENAI_API_KEY
+    fi
+    if [ -n "$ANTHROPIC_API_KEY" ]; then
+        export ANTHROPIC_API_KEY
+    fi
+    go run main.go > ../../logs/backend.log 2>&1 &
     BACKEND_PID=$!
     cd ../..
     

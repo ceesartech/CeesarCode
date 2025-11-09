@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -44,10 +45,12 @@ type ExecJob struct {
 }
 
 type AgentRequest struct {
-	Company string `json:"company"`
-	Role    string `json:"role"`
-	Level   string `json:"level"`
-	Count   int    `json:"count,omitempty"`
+	Company   string `json:"company"`
+	Role      string `json:"role"`
+	Level     string `json:"level"`
+	Count     int    `json:"count,omitempty"`
+	Provider  string `json:"provider,omitempty"`  // "gemini", "openai", "claude"
+	APIKey    string `json:"apiKey,omitempty"`     // API key from frontend
 }
 
 type AgentResponse struct {
@@ -69,6 +72,7 @@ func main() {
 	mux.HandleFunc("/api/upload", uploadFile)
 	mux.HandleFunc("/api/agent/generate", generateQuestions)
 	mux.HandleFunc("/api/agent/clean", cleanAIGuestions)
+	mux.HandleFunc("/api/problems/clear", clearAllProblems)
 	mux.Handle("/", http.FileServer(http.Dir(distDir)))
 	log.Fatal(http.ListenAndServe(":8080", mux))
 }
@@ -1154,7 +1158,8 @@ func generateQuestions(w http.ResponseWriter, r *http.Request) {
 		req.Count = 3
 	}
 
-	log.Printf("Agent request: Company=%s, Role=%s, Level=%s, Count=%d", req.Company, req.Role, req.Level, req.Count)
+	log.Printf("Agent request: Company=%s, Role=%s, Level=%s, Count=%d, Provider=%s, HasAPIKey=%v", 
+		req.Company, req.Role, req.Level, req.Count, req.Provider, req.APIKey != "")
 
 	// Generate questions using the agent
 	problems, err := callAgentAPI(req)
@@ -1163,7 +1168,7 @@ func generateQuestions(w http.ResponseWriter, r *http.Request) {
 		// Return error to user instead of silently falling back
 		response := AgentResponse{
 			Status:  "error",
-			Message: "Failed to generate AI questions: " + err.Error() + ". Please check your GEMINI_API_KEY and try again.",
+			Message: "Failed to generate AI questions: " + err.Error() + ". Please check your API key and try again.",
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
@@ -1192,52 +1197,78 @@ func generateQuestions(w http.ResponseWriter, r *http.Request) {
 }
 
 func callAgentAPI(req AgentRequest) ([]Problem, error) {
-	// Try to use real AI generation first, fallback to mock ONLY if API key is not available
-	apiKey := os.Getenv("GEMINI_API_KEY")
-	log.Printf("GEMINI_API_KEY status: %s", func() string {
-		if apiKey == "" {
-			return "NOT FOUND"
+	// Determine provider and API key
+	provider := strings.ToLower(req.Provider)
+	if provider == "" {
+		provider = "gemini" // Default to Gemini
+	}
+	log.Printf("callAgentAPI: provider=%s, hasRequestAPIKey=%v", provider, req.APIKey != "")
+	
+	var apiKey string
+	if req.APIKey != "" {
+		// Use API key from request (frontend)
+		apiKey = req.APIKey
+		log.Printf("Using API key from request for provider: %s (key length: %d)", provider, len(apiKey))
+	} else {
+		// Fallback to environment variables
+		switch provider {
+		case "gemini":
+			apiKey = os.Getenv("GEMINI_API_KEY")
+		case "openai":
+			apiKey = os.Getenv("OPENAI_API_KEY")
+		case "claude":
+			apiKey = os.Getenv("ANTHROPIC_API_KEY")
 		}
-		return "FOUND (length: " + fmt.Sprintf("%d", len(apiKey)) + ")"
-	}())
+		log.Printf("Using API key from environment for provider: %s (key length: %d)", provider, len(apiKey))
+	}
 
 	if apiKey == "" {
-		log.Printf("GEMINI_API_KEY not found, using mock questions")
+		log.Printf("%s API key not found, using mock questions", strings.ToUpper(provider))
 		return generateMockQuestions(req), nil
 	}
 
-	// Validate API key format (should start with AIza)
-	if !strings.HasPrefix(apiKey, "AIza") {
-		log.Printf("WARNING: API key format appears invalid (should start with 'AIza'). Attempting anyway...")
-	}
-
-	// Use Google Gemini for real AI generation
-	log.Printf("Attempting AI generation with key: %s...", apiKey[:min(10, len(apiKey))]+"...")
-	problems, err := generateAIGuestions(req, apiKey)
-	if err != nil {
-		// Don't silently fall back - return error so user knows what went wrong
-		log.Printf("AI generation failed: %v", err)
-
-		// Only fall back to mock questions if it's a truly fatal error (invalid API key, no internet, etc.)
-		// For rate limits and parsing errors, we should retry or show error to user
-		if strings.Contains(err.Error(), "invalid API key") ||
-			strings.Contains(err.Error(), "authentication") ||
-			strings.Contains(err.Error(), "network") ||
-			strings.Contains(err.Error(), "connection") {
-			log.Printf("Fatal error detected, falling back to mock questions")
+	// Call appropriate provider
+	switch provider {
+	case "gemini":
+		log.Printf("Attempting AI generation with Gemini, key: %s...", apiKey[:min(10, len(apiKey))]+"...")
+		problems, err := generateAIGuestions(req, apiKey)
+		if err != nil {
+			log.Printf("AI generation failed: %v", err)
 			return generateMockQuestions(req), nil
 		}
-
-		// For other errors (rate limits, parsing), return error so user can retry
-		return nil, fmt.Errorf("AI generation failed: %v. Please check your API key and try again", err)
+		return problems, nil
+	case "openai":
+		log.Printf("Attempting AI generation with OpenAI, key prefix: %s...", apiKey[:min(10, len(apiKey))]+"...")
+		log.Printf("OpenAI request details: Company=%s, Role=%s, Level=%s, Count=%d", req.Company, req.Role, req.Level, req.Count)
+		problems, err := generateOpenAIQuestions(req, apiKey)
+		if err != nil {
+			log.Printf("OpenAI AI generation failed with error: %v", err)
+			// Return error instead of silently falling back
+			return nil, fmt.Errorf("OpenAI generation failed: %v", err)
+		}
+		if len(problems) == 0 {
+			log.Printf("OpenAI returned 0 problems")
+			return nil, fmt.Errorf("OpenAI returned 0 problems")
+		}
+		log.Printf("OpenAI generation successful, generated %d problems", len(problems))
+		return problems, nil
+	case "claude":
+		log.Printf("Attempting AI generation with Claude, key: %s...", apiKey[:min(10, len(apiKey))]+"...")
+		problems, err := generateClaudeQuestions(req, apiKey)
+		if err != nil {
+			log.Printf("Claude AI generation failed: %v", err)
+			// Return error instead of silently falling back
+			return nil, fmt.Errorf("Claude generation failed: %v", err)
+		}
+		if len(problems) == 0 {
+			return nil, fmt.Errorf("Claude returned 0 problems")
+		}
+		log.Printf("Claude generation successful, generated %d problems", len(problems))
+		return problems, nil
+	default:
+		log.Printf("Unknown provider: %s, falling back to mock questions", provider)
+		return generateMockQuestions(req), nil
 	}
-
-	if len(problems) == 0 {
-		return nil, fmt.Errorf("AI generation returned 0 problems. Please try again.")
-	}
-
-	log.Printf("AI generation successful, generated %d problems", len(problems))
-	return problems, nil
 }
 
 func generateAIGuestions(req AgentRequest, apiKey string) ([]Problem, error) {
@@ -1481,6 +1512,285 @@ IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no 
 	return problems, nil
 }
 
+func generateOpenAIQuestions(req AgentRequest, apiKey string) ([]Problem, error) {
+	ctx := context.Background()
+	
+	// Create prompt
+	prompt := fmt.Sprintf(`You are a coding interview question generator. Generate exactly %d unique coding interview questions for a %s %s position at %s.
+
+CRITICAL: You MUST return ONLY valid JSON. No markdown, no explanations, no code blocks - just pure JSON.
+
+Requirements:
+- Questions should be appropriate for %s level
+- Focus on %s role-specific skills and technologies
+- Include a mix of algorithmic, data structure, and practical problems
+- Each question should have a clear problem statement with examples
+- Include sample input/output examples
+- Provide starter code stubs for Python, Java, and C++
+
+Return ONLY a JSON array (no markdown, no code blocks, no explanations) with this exact format:
+[
+  {
+    "id": "unique-kebab-case-id",
+    "title": "Descriptive Title",
+    "statement": "Detailed problem description with examples and constraints",
+    "languages": ["python", "java", "cpp"],
+    "stub": {
+      "python": "def solution():\n    # Your code here\n    pass",
+      "java": "class Solution {\n    public void solution() {\n        // Your code here\n    }\n}",
+      "cpp": "class Solution {\npublic:\n    void solution() {\n        // Your code here\n    }\n};"
+    }
+  }
+]
+
+IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no code blocks, no explanations.`,
+		req.Count, req.Level, req.Role, req.Company, req.Level, req.Role, req.Level)
+
+	// Prepare request
+	requestBody := map[string]interface{}{
+		"model": "gpt-4o-mini",
+		"messages": []map[string]interface{}{
+			{"role": "user", "content": prompt},
+		},
+		"temperature": 0.7,
+		"max_tokens":  4000,
+	}
+
+	jsonData, err := json.Marshal(requestBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	log.Printf("OpenAI request body size: %d bytes", len(jsonData))
+	log.Printf("OpenAI API key length: %d, prefix: %s", len(apiKey), apiKey[:min(7, len(apiKey))])
+
+	// Make HTTP request
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", "https://api.openai.com/v1/chat/completions", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %v", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
+
+	client := &http.Client{Timeout: 60 * time.Second}
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Read response body
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("OpenAI API error response: %s", string(bodyBytes))
+		return nil, fmt.Errorf("OpenAI API error (status %d): %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var openAIResp struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+		Error *struct {
+			Message string `json:"message"`
+			Type    string `json:"type"`
+		} `json:"error"`
+	}
+
+	if err := json.Unmarshal(bodyBytes, &openAIResp); err != nil {
+		log.Printf("Failed to decode OpenAI response: %v, body: %s", err, string(bodyBytes))
+		return nil, fmt.Errorf("failed to decode response: %v", err)
+	}
+
+	if openAIResp.Error != nil {
+		return nil, fmt.Errorf("OpenAI API error: %s (type: %s)", openAIResp.Error.Message, openAIResp.Error.Type)
+	}
+
+	if len(openAIResp.Choices) == 0 {
+		log.Printf("OpenAI response had no choices, full response: %s", string(bodyBytes))
+		return nil, fmt.Errorf("no choices in OpenAI response")
+	}
+
+	responseText := openAIResp.Choices[0].Message.Content
+	if responseText == "" {
+		log.Printf("OpenAI response had empty content, full response: %s", string(bodyBytes))
+		return nil, fmt.Errorf("empty content in OpenAI response")
+	}
+
+	log.Printf("OpenAI response received, content length: %d", len(responseText))
+	return parseAIResponse(responseText, req)
+}
+
+func generateClaudeQuestions(req AgentRequest, apiKey string) ([]Problem, error) {
+	ctx := context.Background()
+	
+	// Create prompt
+	prompt := fmt.Sprintf(`You are a coding interview question generator. Generate exactly %d unique coding interview questions for a %s %s position at %s.
+
+CRITICAL: You MUST return ONLY valid JSON. No markdown, no explanations, no code blocks - just pure JSON.
+
+Requirements:
+- Questions should be appropriate for %s level
+- Focus on %s role-specific skills and technologies
+- Include a mix of algorithmic, data structure, and practical problems
+- Each question should have a clear problem statement with examples
+- Include sample input/output examples
+- Provide starter code stubs for Python, Java, and C++
+
+Return ONLY a JSON array (no markdown, no code blocks, no explanations) with this exact format:
+[
+  {
+    "id": "unique-kebab-case-id",
+    "title": "Descriptive Title",
+    "statement": "Detailed problem description with examples and constraints",
+    "languages": ["python", "java", "cpp"],
+    "stub": {
+      "python": "def solution():\n    # Your code here\n    pass",
+      "java": "class Solution {\n    public void solution() {\n        // Your code here\n    }\n}",
+      "cpp": "class Solution {\npublic:\n    void solution() {\n        // Your code here\n    }\n};"
+    }
+  }
+]
+
+IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no code blocks, no explanations.`,
+		req.Count, req.Level, req.Role, req.Company, req.Level, req.Role, req.Level)
+
+	// Prepare request
+	requestBody := map[string]interface{}{
+		"model":       "claude-3-5-sonnet-20241022",
+		"max_tokens":  4000,
+		"messages":    []map[string]string{{"role": "user", "content": prompt}},
+	}
+
+	jsonData, err := json.Marshal(requestBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	// Make HTTP request
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", "https://api.anthropic.com/v1/messages", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %v", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("x-api-key", apiKey)
+	httpReq.Header.Set("anthropic-version", "2023-06-01")
+
+	client := &http.Client{Timeout: 60 * time.Second}
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("Claude API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var claudeResp struct {
+		Content []struct {
+			Text string `json:"text"`
+		} `json:"content"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&claudeResp); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %v", err)
+	}
+
+	if len(claudeResp.Content) == 0 {
+		return nil, fmt.Errorf("no content in Claude response")
+	}
+
+	responseText := claudeResp.Content[0].Text
+	return parseAIResponse(responseText, req)
+}
+
+func parseAIResponse(responseText string, req AgentRequest) ([]Problem, error) {
+	// Clean up the response - remove markdown code blocks if present
+	cleanText := responseText
+	cleanText = strings.TrimSpace(cleanText)
+
+	// Remove markdown code blocks (```json ... ``` or ``` ... ```)
+	if strings.HasPrefix(cleanText, "```json") {
+		cleanText = strings.TrimPrefix(cleanText, "```json")
+		cleanText = strings.TrimSuffix(cleanText, "```")
+		cleanText = strings.TrimSpace(cleanText)
+	} else if strings.HasPrefix(cleanText, "```") {
+		cleanText = strings.TrimPrefix(cleanText, "```")
+		lastIdx := strings.LastIndex(cleanText, "```")
+		if lastIdx >= 0 {
+			cleanText = cleanText[:lastIdx] + cleanText[lastIdx+3:]
+		}
+		cleanText = strings.TrimSpace(cleanText)
+	}
+
+	// Try to find JSON array start/end if wrapped in text
+	if idx := strings.Index(cleanText, "["); idx >= 0 {
+		cleanText = cleanText[idx:]
+	}
+	if idx := strings.LastIndex(cleanText, "]"); idx >= 0 {
+		cleanText = cleanText[:idx+1]
+	}
+
+	cleanText = strings.TrimSpace(cleanText)
+
+	// Parse the JSON response
+	var aiProblems []struct {
+		ID        string            `json:"id"`
+		Title     string            `json:"title"`
+		Statement string            `json:"statement"`
+		Languages []string          `json:"languages"`
+		Stub      map[string]string `json:"stub"`
+	}
+
+	if err := json.Unmarshal([]byte(cleanText), &aiProblems); err != nil {
+		log.Printf("JSON parsing error: %v", err)
+		log.Printf("Response text that failed to parse: %s", cleanText)
+		return nil, fmt.Errorf("failed to parse AI response as JSON: %v. Response: %s", err, cleanText[:min(500, len(cleanText))])
+	}
+
+	if len(aiProblems) == 0 {
+		return nil, fmt.Errorf("no problems generated from AI response")
+	}
+
+	// Convert to our Problem format
+	problems := make([]Problem, len(aiProblems))
+	baseID := fmt.Sprintf("%s-%s-%s", strings.ToLower(req.Company), strings.ToLower(req.Role), strings.ToLower(req.Level))
+
+	for i, aiProblem := range aiProblems {
+		if aiProblem.ID == "" {
+			aiProblem.ID = fmt.Sprintf("problem-%d", i+1)
+		}
+		if aiProblem.Title == "" {
+			aiProblem.Title = fmt.Sprintf("Problem %d", i+1)
+		}
+		if len(aiProblem.Languages) == 0 {
+			aiProblem.Languages = []string{"python", "java", "cpp"}
+		}
+		if aiProblem.Stub == nil {
+			aiProblem.Stub = make(map[string]string)
+		}
+
+		problems[i] = Problem{
+			ID:        fmt.Sprintf("%s-%s", baseID, aiProblem.ID),
+			Title:     aiProblem.Title,
+			Statement: aiProblem.Statement,
+			Languages: aiProblem.Languages,
+			Stub:      aiProblem.Stub,
+		}
+	}
+
+	return problems, nil
+}
+
 func min(a, b int) int {
 	if a < b {
 		return a
@@ -1528,6 +1838,58 @@ func cleanAIGuestions(w http.ResponseWriter, r *http.Request) {
 		"status":  "success",
 		"message": fmt.Sprintf("Cleaned %d AI-generated problems", cleanedCount),
 		"count":   cleanedCount,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+func clearAllProblems(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(405)
+		json.NewEncoder(w).Encode(map[string]string{"error": "POST only"})
+		return
+	}
+
+	log.Printf("Clearing all problems from %s", dataDir)
+
+	// Get list of all problems
+	entries, err := os.ReadDir(dataDir)
+	if err != nil {
+		log.Printf("Error reading dataDir %s: %v", dataDir, err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(500)
+		json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("Failed to read problems directory: %v", err)})
+		return
+	}
+
+	clearedCount := 0
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		// Skip the uploads directory
+		if entry.Name() == "uploads" {
+			continue
+		}
+
+		problemPath := filepath.Join(dataDir, entry.Name())
+		log.Printf("Removing problem: %s", entry.Name())
+
+		// Remove the entire problem directory
+		if err := os.RemoveAll(problemPath); err != nil {
+			log.Printf("Error removing problem %s: %v", entry.Name(), err)
+			continue
+		}
+		clearedCount++
+	}
+
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": fmt.Sprintf("Cleared %d problems", clearedCount),
+		"count":   clearedCount,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

@@ -72,8 +72,12 @@ while [[ $# -gt 0 ]]; do
             FOREGROUND=true
             shift
             ;;
+        -p|--provider)
+            AI_PROVIDER="$2"
+            shift 2
+            ;;
         -k|--api-key)
-            GEMINI_API_KEY="$2"
+            API_KEY="$2"
             shift 2
             ;;
         --help)
@@ -83,7 +87,8 @@ while [[ $# -gt 0 ]]; do
             echo "  -p, --port PORT      Port to listen on (default: $DEFAULT_PORT)"
             echo "  -h, --host HOST      Host to bind to (default: $DEFAULT_HOST)"
             echo "  -l, --log FILE       Log file path (default: $DEFAULT_LOG_FILE)"
-            echo "  -k, --api-key KEY    Gemini API key for AI question generation"
+            echo "  --provider PROVIDER  AI provider: gemini, openai, or claude (default: gemini)"
+            echo "  -k, --api-key KEY    API key for AI question generation"
             echo "  -d, --daemon         Run as daemon in background"
             echo "  -f, --foreground     Run in foreground (default)"
             echo "  --help               Show this help message"
@@ -91,21 +96,29 @@ while [[ $# -gt 0 ]]; do
             echo "Examples:"
             echo "  $0                                    # Start on default port 8080"
             echo "  $0 -p 3000 -d                        # Start on port 3000 as daemon"
-            echo "  $0 -k YOUR_API_KEY                    # Start with API key from argument"
-            echo "  $0 -p 9000 -k YOUR_API_KEY -d        # Start on port 9000 with API key as daemon"
+            echo "  $0 --provider openai -k YOUR_KEY     # Start with OpenAI API key"
+            echo "  $0 --provider claude -k YOUR_KEY -d   # Start with Claude API key as daemon"
             echo ""
             echo "AI Agent:"
             echo "  API key can be provided via:"
-            echo "  1. Command line argument: -k or --api-key"
-            echo "  2. .env file (GEMINI_API_KEY variable)"
-            echo "  3. Run './setup-ai.sh' to configure AI question generation"
+            echo "  1. Command line: --provider PROVIDER -k/--api-key KEY"
+            echo "  2. .env file (GEMINI_API_KEY, OPENAI_API_KEY, or ANTHROPIC_API_KEY)"
+            echo "  3. Run './scripts/setup-ai.sh' to configure AI question generation"
             echo "  AI Agent generates unique, contextual questions based on company/role/level"
             exit 0
             ;;
         *)
             # Check if it's a positional argument (API key without flag)
-            if [[ "$1" =~ ^AIza ]]; then
-                GEMINI_API_KEY="$1"
+            if [[ "$1" =~ ^(AIza|sk-|sk-ant-) ]]; then
+                API_KEY="$1"
+                # Auto-detect provider from key prefix
+                if [[ "$1" =~ ^AIza ]]; then
+                    AI_PROVIDER="gemini"
+                elif [[ "$1" =~ ^sk-ant- ]]; then
+                    AI_PROVIDER="claude"
+                elif [[ "$1" =~ ^sk- ]]; then
+                    AI_PROVIDER="openai"
+                fi
                 shift
             else
                 print_error "Unknown option: $1"
@@ -166,26 +179,64 @@ create_directories() {
 
 # Function to load AI API key
 load_ai_key() {
+    # Default provider
+    AI_PROVIDER=${AI_PROVIDER:-gemini}
+    
     # If API key already set from command line, use it
-    if [ -n "$GEMINI_API_KEY" ]; then
-        print_success "AI Agent enabled with Gemini API key from command line"
-        export GEMINI_API_KEY
+    if [ -n "$API_KEY" ]; then
+        case "$AI_PROVIDER" in
+            gemini)
+                GEMINI_API_KEY="$API_KEY"
+                export GEMINI_API_KEY
+                print_success "AI Agent enabled with Gemini API key from command line"
+                ;;
+            openai)
+                OPENAI_API_KEY="$API_KEY"
+                export OPENAI_API_KEY
+                print_success "AI Agent enabled with OpenAI API key from command line"
+                ;;
+            claude)
+                ANTHROPIC_API_KEY="$API_KEY"
+                export ANTHROPIC_API_KEY
+                print_success "AI Agent enabled with Claude API key from command line"
+                ;;
+        esac
         return
     fi
     
     # Otherwise, try loading from .env file
     if [ -f ".env" ]; then
-        print_status "Loading AI API key from .env file..."
+        print_status "Loading AI API keys from .env file..."
         source .env
-        if [ -n "$GEMINI_API_KEY" ]; then
-            print_success "AI Agent enabled with Gemini API key from .env file"
-            export GEMINI_API_KEY
-        else
-            print_warning "GEMINI_API_KEY not found in .env file - AI Agent will use fallback templates"
-        fi
+        case "$AI_PROVIDER" in
+            gemini)
+                if [ -n "$GEMINI_API_KEY" ]; then
+                    export GEMINI_API_KEY
+                    print_success "AI Agent enabled with Gemini API key from .env file"
+                else
+                    print_warning "GEMINI_API_KEY not found in .env file - AI Agent will use fallback templates"
+                fi
+                ;;
+            openai)
+                if [ -n "$OPENAI_API_KEY" ]; then
+                    export OPENAI_API_KEY
+                    print_success "AI Agent enabled with OpenAI API key from .env file"
+                else
+                    print_warning "OPENAI_API_KEY not found in .env file - AI Agent will use fallback templates"
+                fi
+                ;;
+            claude)
+                if [ -n "$ANTHROPIC_API_KEY" ]; then
+                    export ANTHROPIC_API_KEY
+                    print_success "AI Agent enabled with Claude API key from .env file"
+                else
+                    print_warning "ANTHROPIC_API_KEY not found in .env file - AI Agent will use fallback templates"
+                fi
+                ;;
+        esac
     else
         print_warning ".env file not found - AI Agent will use fallback templates"
-        print_status "Run './setup-ai.sh' or use -k/--api-key flag to set up AI generation"
+        print_status "Run './scripts/setup-ai.sh' or use -p/--provider and -k/--api-key flags to set up AI generation"
     fi
 }
 
@@ -197,11 +248,17 @@ start_foreground() {
     echo ""
     
     cd dist
+    # Export all API keys (backend will choose based on request)
     if [ -n "$GEMINI_API_KEY" ]; then
-        exec env GEMINI_API_KEY="$GEMINI_API_KEY" ./server
-    else
-        exec ./server
+        export GEMINI_API_KEY
     fi
+    if [ -n "$OPENAI_API_KEY" ]; then
+        export OPENAI_API_KEY
+    fi
+    if [ -n "$ANTHROPIC_API_KEY" ]; then
+        export ANTHROPIC_API_KEY
+    fi
+    exec ./server
 }
 
 # Function to start server as daemon
@@ -210,12 +267,19 @@ start_daemon() {
     
     cd dist
     
-    # Start server in background with AI API key
+    # Export all API keys (backend will choose based on request)
     if [ -n "$GEMINI_API_KEY" ]; then
-        nohup env GEMINI_API_KEY="$GEMINI_API_KEY" ./server > "../$LOG_FILE" 2>&1 &
-    else
-        nohup ./server > "../$LOG_FILE" 2>&1 &
+        export GEMINI_API_KEY
     fi
+    if [ -n "$OPENAI_API_KEY" ]; then
+        export OPENAI_API_KEY
+    fi
+    if [ -n "$ANTHROPIC_API_KEY" ]; then
+        export ANTHROPIC_API_KEY
+    fi
+    
+    # Start server in background
+    nohup ./server > "../$LOG_FILE" 2>&1 &
     local server_pid=$!
     
     # Save PID
