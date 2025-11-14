@@ -6,7 +6,98 @@ This document provides a comprehensive overview of all features in CeesarCode, i
 
 ---
 
-## ✨ Latest Features (v1.3.0)
+## ✨ Latest Features (v1.4.0)
+
+### 1. System Design Questions with Excalidraw Canvas
+
+**Description**: Full support for system design interview questions with interactive diagramming using Excalidraw.
+
+**Features**:
+- System design questions can be created manually or generated via AI
+- Excalidraw canvas appears in the main workspace after question creation
+- Canvas replaces code editor for system design questions
+- Fullscreen mode for better design experience
+- Auto-save drawings to backend as you work
+- Lazy loading with error boundaries for reliability
+
+**Workflow**:
+1. Create system design question (title and statement only)
+2. Question appears in problem list with "System Design" badge
+3. Select question to open Excalidraw canvas
+4. Draw architecture diagrams using the canvas
+5. Click "Fullscreen" button for maximum workspace
+6. Drawings are automatically saved
+
+**Technical Details**:
+- Excalidraw component lazy-loaded to prevent blocking
+- Error boundaries catch and display errors gracefully
+- Memoized onChange handler prevents infinite loops
+- Proper serialization (removes non-serializable Map objects)
+- Supports both uppercase and lowercase Type fields
+
+---
+
+### 2. Delete Individual Questions
+
+**Description**: Delete any question directly from the problem list.
+
+**Features**:
+- Delete button (🗑️) on each problem card
+- Confirmation dialog before deletion
+- Removes problem directory and all associated files
+- Clears selection if deleted problem was currently selected
+- Updates problem list immediately after deletion
+
+**API Endpoint**: `DELETE /api/problems/{id}`
+
+**Usage**:
+- Hover over any problem in the sidebar
+- Click the trash icon on the right
+- Confirm deletion in the dialog
+- Problem is permanently removed
+
+---
+
+### 3. CeesarCode Logo with Homepage Navigation
+
+**Description**: Professional logo with clickable navigation to homepage.
+
+**Features**:
+- Modern SVG logo with gradient design
+- Stylized "C" letter with code bracket decorations
+- "CeesarCode" text with gradient styling
+- "Technical Interview Practice" subtitle
+- Clickable - navigates to homepage
+- Hover effects for better UX
+
+**Homepage Navigation**:
+- Clears selected problem
+- Resets code editor
+- Clears results and errors
+- Resets Jupyter mode
+- Exits fullscreen if active
+- Smooth scroll to top
+
+---
+
+### 4. Simplified System Design Prompts
+
+**Description**: AI-generated system design questions now use simple, concise prompts.
+
+**Changes**:
+- Removed detailed functional/non-functional requirements
+- Removed constraints and assumptions sections
+- Simple question prompts like "Design a machine learning based system to detect fraudulent signals on ads datasets"
+- Brief context allowed but kept minimal
+- Works for all AI providers (Gemini, OpenAI, Claude)
+
+**Example Output**:
+- Before: Detailed problem with requirements, constraints, use cases
+- After: "Design a distributed caching system for a global e-commerce platform"
+
+---
+
+## ✨ Previous Features (v1.3.0)
 
 ### 1. Line Numbers in Code Editor
 

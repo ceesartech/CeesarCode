@@ -1,4 +1,229 @@
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef, lazy, Suspense } from 'react'
+import '@excalidraw/excalidraw/index.css'
+
+// Lazy load Excalidraw to prevent blocking main thread
+const Excalidraw = lazy(() => 
+  import('@excalidraw/excalidraw')
+    .then(module => ({ default: module.Excalidraw }))
+    .catch(err => {
+      console.error('Failed to load Excalidraw:', err)
+      throw err
+    })
+)
+
+// CeesarCode Logo Component
+const CeesarCodeLogo = ({ theme, onClick }) => (
+  <div
+    onClick={onClick}
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px',
+      cursor: 'pointer',
+      transition: 'opacity 0.2s ease',
+      textDecoration: 'none'
+    }}
+    onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
+    onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+  >
+    <svg
+      width="40"
+      height="40"
+      viewBox="0 0 40 40"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      {/* Background circle with gradient */}
+      <defs>
+        <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#2563EB" />
+          <stop offset="100%" stopColor="#1E40AF" />
+        </linearGradient>
+      </defs>
+      <circle cx="20" cy="20" r="18" fill="url(#logoGradient)" />
+      
+      {/* Stylized "C" letter */}
+      <path
+        d="M 20 12 C 15 12 12 15 12 20 C 12 25 15 28 20 28"
+        stroke="white"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        fill="none"
+      />
+      
+      {/* Code brackets decoration */}
+      <path
+        d="M 26 14 L 24 16 L 26 18"
+        stroke="white"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      <path
+        d="M 14 22 L 16 24 L 14 26"
+        stroke="white"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </svg>
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'flex-start',
+      lineHeight: '1.2'
+    }}>
+      <span style={{
+        fontSize: '20px',
+        fontWeight: '700',
+        color: theme.text,
+        letterSpacing: '-0.5px',
+        background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.accent} 100%)`,
+        WebkitBackgroundClip: 'text',
+        WebkitTextFillColor: 'transparent',
+        backgroundClip: 'text'
+      }}>
+        CeesarCode
+      </span>
+      <span style={{
+        fontSize: '10px',
+        color: theme.textSecondary,
+        fontWeight: '500',
+        letterSpacing: '1px',
+        textTransform: 'uppercase'
+      }}>
+        Technical Interview Practice
+      </span>
+    </div>
+  </div>
+)
+
+// Error boundary for Excalidraw
+class ExcalidrawErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error }
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('Excalidraw Error:', error, errorInfo)
+    console.error('Error stack:', error.stack)
+    console.error('Component stack:', errorInfo.componentStack)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100%',
+          padding: '20px',
+          color: this.props.theme.error,
+          fontSize: '14px',
+          textAlign: 'center'
+        }}>
+          <div style={{ marginBottom: '10px', fontSize: '16px', fontWeight: '600' }}>
+            Failed to load drawing canvas
+          </div>
+          <div style={{ color: this.props.theme.textSecondary, fontSize: '12px' }}>
+            {this.state.error?.message || 'An error occurred while loading Excalidraw'}
+          </div>
+          <button
+            onClick={() => this.setState({ hasError: false, error: null })}
+            style={{
+              marginTop: '12px',
+              padding: '8px 16px',
+              backgroundColor: this.props.theme.primary,
+              color: '#fff',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '12px'
+            }}
+          >
+            Try Again
+          </button>
+        </div>
+      )
+    }
+
+    return this.props.children
+  }
+}
+
+// Top-level error boundary
+class AppErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error }
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('App Error:', error, errorInfo)
+    console.error('Error stack:', error.stack)
+    console.error('Component stack:', errorInfo.componentStack)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100vh',
+          padding: '40px',
+          backgroundColor: '#f5f5f5',
+          color: '#d32f2f',
+          fontSize: '16px',
+          textAlign: 'center'
+        }}>
+          <div style={{ marginBottom: '16px', fontSize: '24px', fontWeight: '600' }}>
+            Something went wrong
+          </div>
+          <div style={{ color: '#666', fontSize: '14px', maxWidth: '600px', marginBottom: '8px' }}>
+            {this.state.error?.message || 'An unexpected error occurred'}
+          </div>
+          <div style={{ color: '#999', fontSize: '12px', maxWidth: '600px', fontFamily: 'monospace', marginTop: '12px' }}>
+            Check the browser console for more details
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              marginTop: '24px',
+              padding: '12px 24px',
+              backgroundColor: '#2563EB',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '600'
+            }}
+          >
+            Reload Page
+          </button>
+        </div>
+      )
+    }
+
+    return this.props.children
+  }
+}
 
 const styles = {
   light: {
@@ -247,7 +472,7 @@ const getDefaultStubForLanguage = (language) => {
   return stubs[language] || '// Write your solution here\n'
 }
 
-export default function App() {
+function AppContent() {
   const [problems, setProblems] = useState([])
   const [selectedProblem, setSelectedProblem] = useState(null)
   const [selectedLanguage, setSelectedLanguage] = useState('python')
@@ -258,6 +483,9 @@ export default function App() {
     const saved = localStorage.getItem('ceesarcode-dark-mode')
     return saved ? JSON.parse(saved) : false
   })
+  
+  // Use ref to track Excalidraw data to prevent infinite loops
+  const excalidrawDataRef = useRef('')
   const [isLoadingProblems, setIsLoadingProblems] = useState(true)
   const [isLoadingProblem, setIsLoadingProblem] = useState(false)
   const [isRunning, setIsRunning] = useState(false)
@@ -269,8 +497,82 @@ export default function App() {
     title: '',
     statement: '',
     languages: ['python'],
-    stub: { python: '' }
+    stub: { python: '' },
+    type: 'coding', // 'coding' or 'system_design'
+    drawingData: '' // Excalidraw drawing data
   })
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  
+  // Save system design drawing to backend
+  const saveSystemDesignDrawing = async (problemId, drawingData) => {
+    try {
+      const response = await fetch(`/api/problems/${problemId}/drawing`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ drawingData })
+      })
+      if (!response.ok) throw new Error('Failed to save drawing')
+      // Update local state
+      setSelectedProblem(prev => prev ? {...prev, DrawingData: drawingData} : null)
+    } catch (err) {
+      console.error('Error saving drawing:', err)
+    }
+  }
+  
+  // Delete a problem
+  const deleteProblem = async (problemId) => {
+    try {
+      console.log('Deleting problem:', problemId)
+      const response = await fetch(`/api/problems/${problemId}`, {
+        method: 'DELETE'
+      })
+      
+      console.log('Delete response status:', response.status, response.statusText)
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Delete error response:', errorText)
+        throw new Error(`Failed to delete problem (${response.status}): ${errorText}`)
+      }
+      
+      // Remove from local state
+      setProblems(prev => prev.filter(p => (p.ID || p.id) !== problemId))
+      
+      // Clear selection if deleted problem was selected
+      if (selectedProblem && (selectedProblem.ID || selectedProblem.id) === problemId) {
+        setSelectedProblem(null)
+        setCode('')
+        setResult(null)
+      }
+      
+      console.log('Problem deleted successfully')
+    } catch (err) {
+      console.error('Error deleting problem:', err)
+      alert('Failed to delete problem: ' + err.message)
+    }
+  }
+  
+  // Memoized callback for Excalidraw changes to prevent infinite loops
+  const handleExcalidrawChange = React.useCallback((elements, appState, files) => {
+    try {
+      // Create a clean copy of appState without the collaborators Map (can't be serialized)
+      const cleanAppState = { ...appState }
+      delete cleanAppState.collaborators
+      
+      const drawingData = JSON.stringify({ elements, appState: cleanAppState, files })
+      // Only update if data actually changed
+      if (excalidrawDataRef.current !== drawingData) {
+        excalidrawDataRef.current = drawingData
+        // Save to the selected problem
+        if (selectedProblem) {
+          saveSystemDesignDrawing(selectedProblem.ID, drawingData)
+        }
+      }
+    } catch (err) {
+      console.error('Failed to save drawing data:', err)
+    }
+  }, [selectedProblem])
+  
   const [isSubmittingCode, setIsSubmittingCode] = useState(false)
   const [uploadedFiles, setUploadedFiles] = useSafeArrayState([])
   const [isJupyterMode, setIsJupyterMode] = useState(false)
@@ -289,7 +591,9 @@ export default function App() {
     companyDescription: '',
     interviewType: '', // Type or description of the interview
     provider: 'gemini', // 'gemini', 'openai', 'claude'
-    apiKey: '' // API key from UI (for production)
+    apiKey: '', // API key from UI (for production)
+    defaultLanguage: 'python', // Default programming language for generated questions
+    questionType: 'coding' // 'coding' or 'system_design'
   })
   const [useCustomRole, setUseCustomRole] = useState(false)
   const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false)
@@ -752,7 +1056,9 @@ export default function App() {
       companyDescription: agentRequest.companyDescription || '',
       interviewType: agentRequest.interviewType || '',
       provider: agentRequest.provider || 'gemini',
-      apiKey: agentRequest.apiKey || '' // Send API key if provided
+      apiKey: agentRequest.apiKey || '', // Send API key if provided
+      defaultLanguage: agentRequest.defaultLanguage || 'python', // Default language for generated questions
+      questionType: agentRequest.questionType || 'coding' // Question type: coding or system_design
     }
     
     console.log('Sending request:', { ...requestData, apiKey: requestData.apiKey ? '***' + requestData.apiKey.slice(-4) : 'empty' })
@@ -762,14 +1068,20 @@ export default function App() {
     setError(null)
 
     try {
+      // Create AbortController for timeout
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 120000) // 2 minute timeout
+
       const response = await fetch('/api/agent/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(requestData)
+        body: JSON.stringify(requestData),
+        signal: controller.signal
       })
 
+      clearTimeout(timeoutId)
       const result = await response.json()
       
       if (!response.ok) {
@@ -799,8 +1111,13 @@ export default function App() {
       }
     } catch (err) {
       console.error('Error generating questions:', err)
-      setError(err.message)
-      alert('Failed to generate questions: ' + err.message)
+      if (err.name === 'AbortError') {
+        setError('Request timed out. The AI generation is taking longer than expected. Please try again or check your internet connection.')
+        alert('Request timed out after 2 minutes. Please try again or check your internet connection.')
+      } else {
+        setError(err.message)
+        alert('Failed to generate questions: ' + err.message)
+      }
     } finally {
       setIsGeneratingQuestions(false)
     }
@@ -3424,6 +3741,20 @@ export default function App() {
     fetchProblems()
   }
 
+  // Navigate to homepage (clear selection and reset state)
+  const goToHomepage = () => {
+    setSelectedProblem(null)
+    setCode('')
+    setResult(null)
+    setError(null)
+    setJupyterCells([{ id: 1, code: '', output: '', isRunning: false, hasExecuted: false }])
+    setIsJupyterMode(false)
+    setIsFullscreen(false)
+    window.history.pushState({}, '', window.location.pathname)
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -3449,15 +3780,7 @@ export default function App() {
           alignItems: 'center',
           gap: '16px'
         }}>
-          <h1 style={{
-            margin: 0,
-            color: theme.text,
-            fontSize: '20px',
-            fontWeight: '600',
-            letterSpacing: '-0.5px'
-          }}>
-            CeesarCode
-          </h1>
+          <CeesarCodeLogo theme={theme} onClick={goToHomepage} />
           <button
             onClick={() => setShowCreateProblem(true)}
             style={{
@@ -3633,7 +3956,7 @@ export default function App() {
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', minHeight: '200px' }}>
               <div>
                 <label style={{
                   display: 'block',
@@ -3700,6 +4023,57 @@ export default function App() {
               <div>
                 <label style={{
                   display: 'block',
+                  marginBottom: '8px',
+                  color: theme.text,
+                  fontSize: '14px',
+                  fontWeight: '600'
+                }}>
+                  Question Type
+                </label>
+                <select
+                  value={newProblem.type}
+                  onChange={(e) => setNewProblem({...newProblem, type: e.target.value})}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: '8px',
+                    backgroundColor: theme.background,
+                    color: theme.text,
+                    fontSize: '14px',
+                    transition: 'border-color 0.2s ease',
+                    cursor: 'pointer'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = theme.primary}
+                  onBlur={(e) => e.target.style.borderColor = theme.border}
+                >
+                  <option value="coding">Coding Question</option>
+                  <option value="system_design">System Design Question</option>
+                </select>
+              </div>
+
+              {newProblem.type === 'system_design' && (
+                <div style={{
+                  padding: '16px',
+                  backgroundColor: theme.secondary,
+                  borderRadius: '8px',
+                  border: `1px solid ${theme.border}`
+                }}>
+                  <p style={{
+                    margin: 0,
+                    color: theme.textSecondary,
+                    fontSize: '14px',
+                    lineHeight: '1.6'
+                  }}>
+                    💡 <strong>Note:</strong> After creating this system design question, you'll be able to draw your architecture diagram in the main workspace using the Excalidraw canvas.
+                  </p>
+                </div>
+              )}
+
+              {newProblem.type === 'coding' && (
+              <div>
+                <label style={{
+                  display: 'block',
                   marginBottom: '4px',
                   color: theme.text,
                   fontSize: '14px',
@@ -3737,9 +4111,10 @@ export default function App() {
                       />
                       {lang}
                     </label>
-                  ))}
+                    ))}
                 </div>
               </div>
+              )}
 
               <div style={{
                 display: 'flex',
@@ -3799,7 +4174,9 @@ export default function App() {
                         title: '',
                         statement: '',
                         languages: ['python'],
-                        stub: { python: '' }
+                        stub: { python: '' },
+                        type: 'coding',
+                        drawingData: ''
                       })
                     } catch (err) {
                       console.error('Error creating problem:', err)
@@ -4074,6 +4451,98 @@ export default function App() {
                   }}
                 />
               </div>
+
+              <div>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '8px',
+                  color: theme.text,
+                  fontSize: '14px',
+                  fontWeight: '600'
+                }}>
+                  Question Type
+                </label>
+                <select
+                  value={agentRequest.questionType}
+                  onChange={(e) => setAgentRequest({...agentRequest, questionType: e.target.value})}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: '8px',
+                    backgroundColor: theme.background,
+                    color: theme.text,
+                    fontSize: '14px',
+                    transition: 'border-color 0.2s ease',
+                    cursor: 'pointer'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = theme.primary}
+                  onBlur={(e) => e.target.style.borderColor = theme.border}
+                >
+                  <option value="coding">Coding Questions</option>
+                  <option value="system_design">System Design Questions</option>
+                </select>
+                <div style={{
+                  marginTop: '4px',
+                  fontSize: '12px',
+                  color: theme.textSecondary,
+                  fontStyle: 'italic'
+                }}>
+                  {agentRequest.questionType === 'system_design' 
+                    ? 'Generate system design interview questions with architecture diagrams'
+                    : 'Generate coding interview questions with programming challenges'}
+                </div>
+              </div>
+
+              {agentRequest.questionType === 'coding' && (
+              <div>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '8px',
+                  color: theme.text,
+                  fontSize: '14px',
+                  fontWeight: '600'
+                }}>
+                  Default Programming Language
+                </label>
+                <select
+                  value={agentRequest.defaultLanguage}
+                  onChange={(e) => setAgentRequest({...agentRequest, defaultLanguage: e.target.value})}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: '8px',
+                    backgroundColor: theme.background,
+                    color: theme.text,
+                    fontSize: '14px',
+                    transition: 'border-color 0.2s ease',
+                    cursor: 'pointer'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = theme.primary}
+                  onBlur={(e) => e.target.style.borderColor = theme.border}
+                >
+                  <option value="python">Python</option>
+                  <option value="javascript">JavaScript</option>
+                  <option value="java">Java</option>
+                  <option value="cpp">C++</option>
+                  <option value="go">Go</option>
+                  <option value="rust">Rust</option>
+                  <option value="c">C</option>
+                  <option value="typescript">TypeScript</option>
+                  <option value="ruby">Ruby</option>
+                  <option value="swift">Swift</option>
+                </select>
+                <div style={{
+                  marginTop: '4px',
+                  fontSize: '12px',
+                  color: theme.textSecondary,
+                  fontStyle: 'italic'
+                }}>
+                  Generated questions will prioritize this language
+                </div>
+              </div>
+              )}
 
               <div>
                 <label style={{
@@ -4528,6 +4997,7 @@ export default function App() {
                   const problemID = problem.ID || problem.id
                   const problemTitle = problem.Title || problem.title
                   const problemLanguages = problem.Languages || problem.languages || []
+                  const problemType = problem.Type || problem.type || 'coding'
                   
                   return (
                     <div
@@ -4575,12 +5045,71 @@ export default function App() {
                       }}
                     >
                       <div style={{ 
-                        fontWeight: '600',
-                        fontSize: '15px',
-                        marginBottom: '6px',
-                        lineHeight: '1.4'
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        marginBottom: '6px'
                       }}>
-                        {problemTitle}
+                        <div style={{ 
+                          fontWeight: '600',
+                          fontSize: '15px',
+                          lineHeight: '1.4',
+                          flex: 1
+                        }}>
+                          {problemTitle}
+                        </div>
+                        {problemType === 'system_design' && (
+                          <span style={{
+                            backgroundColor: selectedProblem && (selectedProblem.ID || selectedProblem.id) === problemID
+                              ? 'rgba(255,255,255,0.2)'
+                              : theme.primary,
+                            color: selectedProblem && (selectedProblem.ID || selectedProblem.id) === problemID
+                              ? '#FFFFFF'
+                              : '#FFFFFF',
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px'
+                          }}>
+                            System Design
+                          </span>
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (window.confirm(`Are you sure you want to delete "${problemTitle}"?`)) {
+                              deleteProblem(problemID)
+                            }
+                          }}
+                          style={{
+                            backgroundColor: 'transparent',
+                            border: 'none',
+                            color: selectedProblem && (selectedProblem.ID || selectedProblem.id) === problemID
+                              ? 'rgba(255,255,255,0.7)'
+                              : theme.error,
+                            cursor: 'pointer',
+                            fontSize: '16px',
+                            padding: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '4px',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.target.style.backgroundColor = selectedProblem && (selectedProblem.ID || selectedProblem.id) === problemID
+                              ? 'rgba(255,255,255,0.1)'
+                              : 'rgba(239, 68, 68, 0.1)'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.target.style.backgroundColor = 'transparent'
+                          }}
+                          title="Delete problem"
+                        >
+                          🗑️
+                        </button>
                       </div>
                       <div style={{
                         fontSize: '12px',
@@ -4807,6 +5336,7 @@ export default function App() {
                   </div>
               </div>
 
+
                 {/* Resize Handle Between Panes */}
                 <div
                   onMouseDown={(e) => {
@@ -4829,8 +5359,112 @@ export default function App() {
                   }}
                 />
 
-                {/* Right Panel: Code Editor */}
-                {!isJupyterMode ? (
+                {/* Right Panel: Code Editor or System Design Canvas */}
+                {selectedProblem && (selectedProblem.Type === 'system_design' || selectedProblem.type === 'system_design') ? (
+                  <div style={{
+                    width: isFullscreen ? '100vw' : `${100 - leftPaneWidth}%`,
+                    height: isFullscreen ? '100vh' : 'auto',
+                    position: isFullscreen ? 'fixed' : 'relative',
+                    top: isFullscreen ? 0 : 'auto',
+                    left: isFullscreen ? 0 : 'auto',
+                    zIndex: isFullscreen ? 9999 : 'auto',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    backgroundColor: theme.background,
+                    overflow: 'hidden',
+                    minWidth: '300px'
+                  }}>
+                    <div style={{
+                      padding: '12px 16px',
+                      borderBottom: `1px solid ${theme.border}`,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      flexShrink: 0,
+                      backgroundColor: theme.surface
+                    }}>
+                      <h4 style={{
+                        margin: 0,
+                        color: theme.text,
+                        fontSize: '14px',
+                        fontWeight: '600'
+                      }}>
+                        System Design Canvas
+                      </h4>
+                      <button
+                        onClick={() => setIsFullscreen(!isFullscreen)}
+                        style={{
+                          padding: '8px 16px',
+                          backgroundColor: theme.primary,
+                          color: '#FFFFFF',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => e.target.style.backgroundColor = theme.accent}
+                        onMouseLeave={(e) => e.target.style.backgroundColor = theme.primary}
+                      >
+                        {isFullscreen ? '⤓ Exit Fullscreen' : '⤢ Fullscreen'}
+                      </button>
+                    </div>
+                    <div style={{
+                      flex: 1,
+                      overflow: 'hidden',
+                      position: 'relative'
+                    }}>
+                      <ExcalidrawErrorBoundary theme={theme}>
+                        <Suspense fallback={
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            height: '100%',
+                            color: theme.textSecondary,
+                            fontSize: '14px'
+                          }}>
+                            Loading design canvas...
+                          </div>
+                        }>
+                          <Excalidraw
+                            onChange={handleExcalidrawChange}
+                            initialData={(() => {
+                              try {
+                                if (selectedProblem.DrawingData) {
+                                  const parsed = JSON.parse(selectedProblem.DrawingData)
+                                  // Ensure appState has required structure
+                                  if (parsed.appState && !parsed.appState.collaborators) {
+                                    parsed.appState.collaborators = new Map()
+                                  }
+                                  return parsed
+                                }
+                                // Return default structure with collaborators
+                                return {
+                                  elements: [],
+                                  appState: { collaborators: new Map() },
+                                  files: {}
+                                }
+                              } catch (err) {
+                                console.error('Failed to parse drawing data:', err)
+                                return {
+                                  elements: [],
+                                  appState: { collaborators: new Map() },
+                                  files: {}
+                                }
+                              }
+                            })()}
+                            theme={isDarkMode ? 'dark' : 'light'}
+                          />
+                        </Suspense>
+                      </ExcalidrawErrorBoundary>
+                    </div>
+                  </div>
+                ) : !isJupyterMode ? (
                 <div style={{
                     width: `${100 - leftPaneWidth}%`,
                     display: 'flex',
@@ -5787,3 +6421,11 @@ const ShortcutItem = ({ keys, description, theme }) => (
   </div>
 )
 
+// Wrap the app in error boundary
+export default function App() {
+  return (
+    <AppErrorBoundary>
+      <AppContent />
+    </AppErrorBoundary>
+  )
+}

@@ -23,11 +23,13 @@ import (
 )
 
 type Problem struct {
-	ID        string            `json:"ID"`
-	Title     string            `json:"Title"`
-	Statement string            `json:"Statement"`
-	Languages []string          `json:"Languages"`
-	Stub      map[string]string `json:"Stub"`
+	ID          string            `json:"ID"`
+	Title       string            `json:"Title"`
+	Statement   string            `json:"Statement"`
+	Languages   []string          `json:"Languages"`
+	Stub        map[string]string `json:"Stub"`
+	Type        string            `json:"Type,omitempty"`        // "coding" or "system_design"
+	DrawingData string            `json:"DrawingData,omitempty"`  // Excalidraw drawing data (JSON string)
 }
 
 type TestCase struct {
@@ -55,6 +57,8 @@ type AgentRequest struct {
 	InterviewType     string `json:"interviewType,omitempty"`
 	Provider          string `json:"provider,omitempty"`  // "gemini", "openai", "claude"
 	APIKey            string `json:"apiKey,omitempty"`     // API key from frontend
+	DefaultLanguage   string `json:"defaultLanguage,omitempty"` // Default language for generated questions (e.g., "python", "javascript", "java")
+	QuestionType      string `json:"questionType,omitempty"`   // "coding" or "system_design"
 }
 
 type AgentResponse struct {
@@ -68,15 +72,28 @@ var distDir = "./"
 
 func main() {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/problems", listProblems)
+	// More specific routes first
+	mux.HandleFunc("/api/problems/create", createProblem)
+	mux.HandleFunc("/api/problems/clear", clearAllProblems)
+	// Handle /api/problems/{id} routes (including DELETE)
+	mux.HandleFunc("/api/problems/", handleProblemsRoutes)
+	// Handle /api/problems (GET only for listing, DELETE goes to handleProblemsRoutes)
+	mux.HandleFunc("/api/problems", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			listProblems(w, r)
+		} else if r.Method == http.MethodDelete {
+			// DELETE /api/problems/{id} - route to handleProblemsRoutes
+			handleProblemsRoutes(w, r)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
 	mux.HandleFunc("/api/problem/", handleProblemRoutes)
 	mux.HandleFunc("/api/submit", submit)
 	mux.HandleFunc("/api/run", runCode)
-	mux.HandleFunc("/api/problems/create", createProblem)
 	mux.HandleFunc("/api/upload", uploadFile)
 	mux.HandleFunc("/api/agent/generate", generateQuestions)
 	mux.HandleFunc("/api/agent/clean", cleanAIGuestions)
-	mux.HandleFunc("/api/problems/clear", clearAllProblems)
 	mux.Handle("/", http.FileServer(http.Dir(distDir)))
 	log.Fatal(http.ListenAndServe(":8080", mux))
 }
@@ -112,7 +129,126 @@ func handleProblemRoutes(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func handleProblemsRoutes(w http.ResponseWriter, r *http.Request) {
+	// Handle both /api/problems/{id} and /api/problems/{id}/ patterns
+	var path string
+	if strings.HasPrefix(r.URL.Path, "/api/problems/") {
+		path = strings.TrimPrefix(r.URL.Path, "/api/problems/")
+	} else if strings.HasPrefix(r.URL.Path, "/api/problems") {
+		// Handle case where it was routed from /api/problems without trailing slash
+		path = strings.TrimPrefix(r.URL.Path, "/api/problems")
+		if path != "" && !strings.HasPrefix(path, "/") {
+			path = "/" + path
+		}
+		path = strings.TrimPrefix(path, "/")
+	} else {
+		http.Error(w, "Invalid path", http.StatusBadRequest)
+		return
+	}
+	
+	parts := strings.Split(path, "/")
+	
+	// Filter out empty parts
+	var cleanParts []string
+	for _, p := range parts {
+		if p != "" {
+			cleanParts = append(cleanParts, p)
+		}
+	}
+	parts = cleanParts
+
+	log.Printf("handleProblemsRoutes: method=%s, originalPath=%s, path=%s, parts=%v", r.Method, r.URL.Path, path, parts)
+
+	// Handle /api/problems/{id}/drawing
+	if len(parts) == 2 && parts[1] == "drawing" && r.Method == http.MethodPut {
+		updateDrawing(w, r, parts[0])
+		return
+	}
+
+	// Handle /api/problems/{id} DELETE
+	if len(parts) == 1 && parts[0] != "" && r.Method == http.MethodDelete {
+		log.Printf("Deleting problem: %s", parts[0])
+		deleteProblem(w, r, parts[0])
+		return
+	}
+
+	log.Printf("No handler matched - returning 404. Method: %s, Parts: %v", r.Method, parts)
+	http.Error(w, "Not found", http.StatusNotFound)
+}
+
+func updateDrawing(w http.ResponseWriter, r *http.Request, problemID string) {
+	var req struct {
+		DrawingData string `json:"drawingData"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Read existing problem
+	problemPath := filepath.Join(dataDir, problemID, "problem.json")
+	data, err := os.ReadFile(problemPath)
+	if err != nil {
+		http.Error(w, "Problem not found", http.StatusNotFound)
+		return
+	}
+
+	var problem Problem
+	if err := json.Unmarshal(data, &problem); err != nil {
+		http.Error(w, "Failed to parse problem", http.StatusInternalServerError)
+		return
+	}
+
+	// Update drawing data
+	problem.DrawingData = req.DrawingData
+
+	// Save updated problem
+	updatedData, err := json.MarshalIndent(problem, "", "  ")
+	if err != nil {
+		http.Error(w, "Failed to serialize problem", http.StatusInternalServerError)
+		return
+	}
+
+	if err := os.WriteFile(problemPath, updatedData, 0644); err != nil {
+		http.Error(w, "Failed to save problem", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+}
+
+func deleteProblem(w http.ResponseWriter, r *http.Request, problemID string) {
+	// URL decode the problem ID to handle spaces and special characters
+	if decoded, err := url.QueryUnescape(problemID); err == nil {
+		problemID = decoded
+	}
+	log.Printf("Attempting to delete problem: %s", problemID)
+	problemPath := filepath.Join(dataDir, problemID)
+	log.Printf("Problem path: %s", problemPath)
+	
+	// Check if problem exists
+	if _, err := os.Stat(problemPath); os.IsNotExist(err) {
+		log.Printf("Problem not found: %s", problemID)
+		http.Error(w, "Problem not found", http.StatusNotFound)
+		return
+	}
+
+	// Delete the entire problem directory
+	if err := os.RemoveAll(problemPath); err != nil {
+		log.Printf("Error deleting problem %s: %v", problemID, err)
+		http.Error(w, "Failed to delete problem", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Successfully deleted problem: %s", problemID)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+}
+
 func listProblems(w http.ResponseWriter, r *http.Request) {
+	// Handle GET request for listing problems
 	ents, err := os.ReadDir(dataDir)
 	if err != nil {
 		log.Printf("Error reading dataDir %s: %v", dataDir, err)
@@ -1162,13 +1298,18 @@ func generateQuestions(w http.ResponseWriter, r *http.Request) {
 		req.Count = 3
 	}
 
-	log.Printf("Agent request: Company=%s, Role=%s, Level=%s, Count=%d, Provider=%s, HasAPIKey=%v", 
-		req.Company, req.Role, req.Level, req.Count, req.Provider, req.APIKey != "")
+	log.Printf("Agent request: Company=%s, Role=%s, Level=%s, Count=%d, Provider=%s, QuestionType=%s, HasAPIKey=%v", 
+		req.Company, req.Role, req.Level, req.Count, req.Provider, req.QuestionType, req.APIKey != "")
+	log.Printf("Starting question generation process...")
 
 	// Generate questions using the agent
+	startTime := time.Now()
 	problems, err := callAgentAPI(req)
+	duration := time.Since(startTime)
+	log.Printf("Question generation completed in %v", duration)
+	
 	if err != nil {
-		log.Printf("Agent API error: %v", err)
+		log.Printf("Agent API error after %v: %v", duration, err)
 		// Return error to user instead of silently falling back
 		response := AgentResponse{
 			Status:  "error",
@@ -1179,6 +1320,8 @@ func generateQuestions(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(response)
 		return
 	}
+	
+	log.Printf("Successfully generated %d problems", len(problems))
 
 	// Save generated problems to the data directory
 	savedProblems := make([]Problem, 0)
@@ -1247,8 +1390,8 @@ func searchWebForPosition(company, role, level string) string {
 		}(query)
 	}
 
-	// Collect results with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	// Collect results with timeout - don't wait for all, just collect what we get quickly
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	var allResults []string
@@ -1262,8 +1405,15 @@ func searchWebForPosition(company, role, level string) string {
 				allResults = append(allResults, result.info)
 				log.Printf("Search completed for query: %s (found %d chars)", result.query, len(result.info))
 			}
+			// If we have enough results, don't wait for all
+			if len(allResults) >= 6 && completed >= 8 {
+				log.Printf("Sufficient search results collected (%d results), proceeding without waiting for all", len(allResults))
+				// Cancel remaining searches by closing context (they'll timeout individually)
+				cancel()
+				break
+			}
 		case <-ctx.Done():
-			log.Printf("Web search timeout after %d completed searches", completed)
+			log.Printf("Web search timeout after %d completed searches, collected %d results", completed, len(allResults))
 			break
 		}
 	}
@@ -1284,7 +1434,7 @@ func searchWebForPosition(company, role, level string) string {
 // performSingleSearch performs a single web search and extracts information
 func performSingleSearch(searchQuery, company, role, level string) string {
 	// Use DuckDuckGo HTML API (no API key required)
-	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	// URL encode the search query
@@ -1301,7 +1451,7 @@ func performSingleSearch(searchQuery, company, role, level string) string {
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
 
 	// Make request
-	client := &http.Client{Timeout: 8 * time.Second}
+	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return ""
@@ -1695,8 +1845,12 @@ func callAgentAPI(req AgentRequest) ([]Problem, error) {
 	log.Printf("callAgentAPI: provider=%s, hasRequestAPIKey=%v", provider, req.APIKey != "")
 	
 	// Perform comprehensive web search for position information to enhance prompts
+	webSearchStart := time.Now()
 	log.Printf("Performing comprehensive web search for %s %s position at %s...", req.Level, req.Role, req.Company)
 	webSearchInfo := searchWebForPosition(req.Company, req.Role, req.Level)
+	webSearchDuration := time.Since(webSearchStart)
+	log.Printf("Web search completed in %v", webSearchDuration)
+	
 	if webSearchInfo != "" {
 		log.Printf("Comprehensive web search completed successfully (length: %d chars)", len(webSearchInfo))
 		// Enhance the request with comprehensive web search information
@@ -1733,21 +1887,25 @@ func callAgentAPI(req AgentRequest) ([]Problem, error) {
 	}
 
 	// Call appropriate provider
+	aiStart := time.Now()
 	switch provider {
 	case "gemini":
 		log.Printf("Attempting AI generation with Gemini, key: %s...", apiKey[:min(10, len(apiKey))]+"...")
 		problems, err := generateAIGuestions(req, apiKey)
+		aiDuration := time.Since(aiStart)
 		if err != nil {
-			log.Printf("AI generation failed: %v", err)
-			return generateMockQuestions(req), nil
+			log.Printf("AI generation failed after %v: %v", aiDuration, err)
+			return nil, fmt.Errorf("Gemini API error: %v", err)
 		}
+		log.Printf("Gemini AI generation completed successfully in %v", aiDuration)
 		return problems, nil
 	case "openai":
 		log.Printf("Attempting AI generation with OpenAI, key prefix: %s...", apiKey[:min(10, len(apiKey))]+"...")
 		log.Printf("OpenAI request details: Company=%s, Role=%s, Level=%s, Count=%d", req.Company, req.Role, req.Level, req.Count)
 		problems, err := generateOpenAIQuestions(req, apiKey)
+		aiDuration := time.Since(aiStart)
 		if err != nil {
-			log.Printf("OpenAI AI generation failed with error: %v", err)
+			log.Printf("OpenAI AI generation failed after %v: %v", aiDuration, err)
 			// Return error instead of silently falling back
 			return nil, fmt.Errorf("OpenAI generation failed: %v", err)
 		}
@@ -1755,25 +1913,81 @@ func callAgentAPI(req AgentRequest) ([]Problem, error) {
 			log.Printf("OpenAI returned 0 problems")
 			return nil, fmt.Errorf("OpenAI returned 0 problems")
 		}
-		log.Printf("OpenAI generation successful, generated %d problems", len(problems))
+		log.Printf("OpenAI generation successful in %v, generated %d problems", aiDuration, len(problems))
 		return problems, nil
 	case "claude":
 		log.Printf("Attempting AI generation with Claude, key: %s...", apiKey[:min(10, len(apiKey))]+"...")
 		problems, err := generateClaudeQuestions(req, apiKey)
+		aiDuration := time.Since(aiStart)
 		if err != nil {
-			log.Printf("Claude AI generation failed: %v", err)
+			log.Printf("Claude AI generation failed after %v: %v", aiDuration, err)
 			// Return error instead of silently falling back
 			return nil, fmt.Errorf("Claude generation failed: %v", err)
 		}
 		if len(problems) == 0 {
 			return nil, fmt.Errorf("Claude returned 0 problems")
 		}
-		log.Printf("Claude generation successful, generated %d problems", len(problems))
+		log.Printf("Claude generation successful in %v, generated %d problems", aiDuration, len(problems))
 		return problems, nil
 	default:
 		log.Printf("Unknown provider: %s, falling back to mock questions", provider)
 		return generateMockQuestions(req), nil
 	}
+}
+
+// getLanguageConfig returns the language list and stub templates based on default language
+func getLanguageConfig(defaultLang string) ([]string, map[string]string) {
+	// Default to python if not specified or invalid
+	if defaultLang == "" {
+		defaultLang = "python"
+	}
+	
+	// Common languages to include
+	allLanguages := []string{"python", "java", "cpp", "javascript", "go", "rust"}
+	
+	// Create language list with default first
+	languages := []string{defaultLang}
+	seen := map[string]bool{defaultLang: true}
+	
+	// Add other common languages
+	for _, lang := range allLanguages {
+		if !seen[lang] {
+			languages = append(languages, lang)
+			seen[lang] = true
+		}
+	}
+	
+	// Stub templates for each language
+	stubs := map[string]string{
+		"python":     "def solution():\n    # Your code here\n    pass",
+		"java":       "class Solution {\n    public void solution() {\n        // Your code here\n    }\n}",
+		"cpp":        "class Solution {\npublic:\n    void solution() {\n        // Your code here\n    }\n};",
+		"javascript": "function solution() {\n    // Your code here\n}",
+		"go":         "func solution() {\n    // Your code here\n}",
+		"rust":       "fn solution() {\n    // Your code here\n}",
+	}
+	
+	// If default language doesn't have a stub, use a generic one
+	if _, exists := stubs[defaultLang]; !exists {
+		stubs[defaultLang] = "// Your code here\n"
+	}
+	
+	return languages, stubs
+}
+
+// formatLanguageStubs formats the stub templates for the prompt
+func formatLanguageStubs(languages []string, stubs map[string]string) string {
+	var result strings.Builder
+	for i, lang := range languages {
+		if stub, exists := stubs[lang]; exists {
+			result.WriteString(fmt.Sprintf(`      "%s": "%s"`, lang, strings.ReplaceAll(stub, "\n", "\\n")))
+			if i < len(languages)-1 {
+				result.WriteString(",")
+			}
+			result.WriteString("\n")
+		}
+	}
+	return result.String()
 }
 
 func generateAIGuestions(req AgentRequest, apiKey string) ([]Problem, error) {
@@ -1815,7 +2029,56 @@ func generateAIGuestions(req AgentRequest, apiKey string) ([]Problem, error) {
 		}
 	}
 	
-	prompt := fmt.Sprintf(`You are a coding interview question generator. Generate exactly %d unique coding interview questions for a %s %s position at %s.%s
+	// Determine question type
+	questionType := req.QuestionType
+	if questionType == "" {
+		questionType = "coding" // Default to coding
+	}
+	
+	var prompt string
+	if questionType == "system_design" {
+		// System design question prompt
+		prompt = fmt.Sprintf(`You are a system design interview question generator. Generate exactly %d unique system design interview questions for a %s %s position at %s.%s
+
+CRITICAL: You MUST return ONLY valid JSON. No markdown, no explanations, no code blocks - just pure JSON.
+
+Requirements:
+- Questions should be appropriate for %s level
+- Focus on %s role-specific system design challenges
+- Each question should be a clear, concise prompt (like "Design a machine learning based system to detect fraudulent signals on ads datasets")
+- You can add a brief context or example, but keep it simple - just the question prompt
+- Consider real-world scenarios relevant to %s
+
+For %s level %s roles at %s, consider:
+- %s-specific system design challenges (e.g., distributed systems, microservices, data pipelines, real-time systems)
+- Technologies and patterns commonly used in %s architecture
+- System complexity appropriate for %s level
+
+Return ONLY a JSON array (no markdown, no code blocks, no explanations) with this exact format:
+[
+  {
+    "id": "unique-kebab-case-id",
+    "title": "System Design: [Topic]",
+    "statement": "Design a [system description]. [Optional: brief context or example]",
+    "type": "system_design",
+    "languages": [],
+    "stub": {}
+  }
+]
+
+IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no code blocks, no explanations.`,
+			req.Count, req.Level, req.Role, req.Company, interviewContext, req.Level, req.Role, req.Role, req.Level, req.Role, req.Company, req.Role, req.Role, req.Level)
+	} else {
+		// Coding question prompt
+		defaultLang := req.DefaultLanguage
+		if defaultLang == "" {
+			defaultLang = "python"
+		}
+		languages, stubs := getLanguageConfig(defaultLang)
+		languageList := fmt.Sprintf(`["%s"]`, strings.Join(languages, `", "`))
+		stubTemplates := formatLanguageStubs(languages, stubs)
+		
+		prompt = fmt.Sprintf(`You are a coding interview question generator. Generate exactly %d unique coding interview questions for a %s %s position at %s.%s
 
 CRITICAL: You MUST return ONLY valid JSON. No markdown, no explanations, no code blocks - just pure JSON.
 
@@ -1825,7 +2088,7 @@ Requirements:
 - Include a mix of algorithmic, data structure, and practical problems
 - Each question should have a clear problem statement with examples
 - Include sample input/output examples
-- Provide starter code stubs for Python, Java, and C++
+- Provide starter code stubs for %s (with %s as the primary/default language)
 
 For %s level %s roles at %s, consider:
 - %s-specific challenges and scenarios
@@ -1838,17 +2101,16 @@ Return ONLY a JSON array (no markdown, no code blocks, no explanations) with thi
     "id": "unique-kebab-case-id",
     "title": "Descriptive Title",
     "statement": "Detailed problem description with examples and constraints",
-    "languages": ["python", "java", "cpp"],
+    "type": "coding",
+    "languages": %s,
     "stub": {
-      "python": "def solution():\n    # Your code here\n    pass",
-      "java": "class Solution {\n    public void solution() {\n        // Your code here\n    }\n}",
-      "cpp": "class Solution {\npublic:\n    void solution() {\n        // Your code here\n    }\n};"
-    }
+%s    }
   }
 ]
 
 IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no code blocks, no explanations.`,
-		req.Count, req.Level, req.Role, req.Company, interviewContext, req.Level, req.Role, req.Level, req.Level, req.Role, req.Company, req.Role, req.Role, req.Level)
+			req.Count, req.Level, req.Role, req.Company, interviewContext, req.Level, req.Role, strings.Join(languages, ", "), defaultLang, req.Level, req.Role, req.Company, req.Role, req.Role, req.Level, languageList, stubTemplates)
+	}
 
 	// Retry logic for rate limiting with exponential backoff
 	// Also try different models if one fails
@@ -1984,11 +2246,13 @@ IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no 
 
 	// Parse the JSON response
 	var aiProblems []struct {
-		ID        string            `json:"id"`
-		Title     string            `json:"title"`
-		Statement string            `json:"statement"`
-		Languages []string          `json:"languages"`
-		Stub      map[string]string `json:"stub"`
+		ID          string            `json:"id"`
+		Title       string            `json:"title"`
+		Statement   string            `json:"statement"`
+		Languages   []string          `json:"languages"`
+		Stub        map[string]string `json:"stub"`
+		Type        string            `json:"type,omitempty"`
+		DrawingData string            `json:"drawingData,omitempty"`
 	}
 
 	if err := json.Unmarshal([]byte(cleanText), &aiProblems); err != nil {
@@ -2014,18 +2278,34 @@ IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no 
 			aiProblem.Title = fmt.Sprintf("Problem %d", i+1)
 		}
 		if len(aiProblem.Languages) == 0 {
-			aiProblem.Languages = []string{"python", "java", "cpp"}
+			// Use default language configuration
+			defaultLang := req.DefaultLanguage
+			if defaultLang == "" {
+				defaultLang = "python"
+			}
+			languages, _ := getLanguageConfig(defaultLang)
+			aiProblem.Languages = languages
 		}
 		if aiProblem.Stub == nil {
 			aiProblem.Stub = make(map[string]string)
 		}
 
+		problemType := aiProblem.Type
+		if problemType == "" {
+			problemType = req.QuestionType
+		}
+		if problemType == "" {
+			problemType = "coding" // Default to coding
+		}
+
 		problems[i] = Problem{
-			ID:        fmt.Sprintf("%s-%s", baseID, aiProblem.ID),
-			Title:     aiProblem.Title,
-			Statement: aiProblem.Statement,
-			Languages: aiProblem.Languages,
-			Stub:      aiProblem.Stub,
+			ID:          fmt.Sprintf("%s-%s", baseID, aiProblem.ID),
+			Title:       aiProblem.Title,
+			Statement:   aiProblem.Statement,
+			Languages:   aiProblem.Languages,
+			Stub:        aiProblem.Stub,
+			Type:        problemType,
+			DrawingData: aiProblem.DrawingData,
 		}
 	}
 
@@ -2053,7 +2333,56 @@ func generateOpenAIQuestions(req AgentRequest, apiKey string) ([]Problem, error)
 		}
 	}
 	
-	prompt := fmt.Sprintf(`You are a coding interview question generator. Generate exactly %d unique coding interview questions for a %s %s position at %s.%s
+	// Determine question type
+	questionType := req.QuestionType
+	if questionType == "" {
+		questionType = "coding" // Default to coding
+	}
+	
+	var prompt string
+	if questionType == "system_design" {
+		// System design question prompt
+		prompt = fmt.Sprintf(`You are a system design interview question generator. Generate exactly %d unique system design interview questions for a %s %s position at %s.%s
+
+CRITICAL: You MUST return ONLY valid JSON. No markdown, no explanations, no code blocks - just pure JSON.
+
+Requirements:
+- Questions should be appropriate for %s level
+- Focus on %s role-specific system design challenges
+- Each question should be a clear, concise prompt (like "Design a machine learning based system to detect fraudulent signals on ads datasets")
+- You can add a brief context or example, but keep it simple - just the question prompt
+- Consider real-world scenarios relevant to %s
+
+For %s level %s roles at %s, consider:
+- %s-specific system design challenges (e.g., distributed systems, microservices, data pipelines, real-time systems)
+- Technologies and patterns commonly used in %s architecture
+- System complexity appropriate for %s level
+
+Return ONLY a JSON array (no markdown, no code blocks, no explanations) with this exact format:
+[
+  {
+    "id": "unique-kebab-case-id",
+    "title": "System Design: [Topic]",
+    "statement": "Design a [system description]. [Optional: brief context or example]",
+    "type": "system_design",
+    "languages": [],
+    "stub": {}
+  }
+]
+
+IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no code blocks, no explanations.`,
+			req.Count, req.Level, req.Role, req.Company, interviewContext, req.Level, req.Role, req.Role, req.Level, req.Role, req.Company, req.Role, req.Role, req.Level)
+	} else {
+		// Coding question prompt
+		defaultLang := req.DefaultLanguage
+		if defaultLang == "" {
+			defaultLang = "python"
+		}
+		languages, stubs := getLanguageConfig(defaultLang)
+		languageList := fmt.Sprintf(`["%s"]`, strings.Join(languages, `", "`))
+		stubTemplates := formatLanguageStubs(languages, stubs)
+		
+		prompt = fmt.Sprintf(`You are a coding interview question generator. Generate exactly %d unique coding interview questions for a %s %s position at %s.%s
 
 CRITICAL: You MUST return ONLY valid JSON. No markdown, no explanations, no code blocks - just pure JSON.
 
@@ -2063,7 +2392,7 @@ Requirements:
 - Include a mix of algorithmic, data structure, and practical problems
 - Each question should have a clear problem statement with examples
 - Include sample input/output examples
-- Provide starter code stubs for Python, Java, and C++
+- Provide starter code stubs for %s (with %s as the primary/default language)
 
 Return ONLY a JSON array (no markdown, no code blocks, no explanations) with this exact format:
 [
@@ -2071,17 +2400,16 @@ Return ONLY a JSON array (no markdown, no code blocks, no explanations) with thi
     "id": "unique-kebab-case-id",
     "title": "Descriptive Title",
     "statement": "Detailed problem description with examples and constraints",
-    "languages": ["python", "java", "cpp"],
+    "type": "coding",
+    "languages": %s,
     "stub": {
-      "python": "def solution():\n    # Your code here\n    pass",
-      "java": "class Solution {\n    public void solution() {\n        // Your code here\n    }\n}",
-      "cpp": "class Solution {\npublic:\n    void solution() {\n        // Your code here\n    }\n};"
-    }
+%s    }
   }
 ]
 
 IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no code blocks, no explanations.`,
-		req.Count, req.Level, req.Role, req.Company, interviewContext, req.Level, req.Role, req.Level)
+			req.Count, req.Level, req.Role, req.Company, interviewContext, req.Level, req.Role, strings.Join(languages, ", "), defaultLang, languageList, stubTemplates)
+	}
 
 	// Prepare request
 	requestBody := map[string]interface{}{
@@ -2184,7 +2512,56 @@ func generateClaudeQuestions(req AgentRequest, apiKey string) ([]Problem, error)
 		}
 	}
 	
-	prompt := fmt.Sprintf(`You are a coding interview question generator. Generate exactly %d unique coding interview questions for a %s %s position at %s.%s
+	// Determine question type
+	questionType := req.QuestionType
+	if questionType == "" {
+		questionType = "coding" // Default to coding
+	}
+	
+	var prompt string
+	if questionType == "system_design" {
+		// System design question prompt
+		prompt = fmt.Sprintf(`You are a system design interview question generator. Generate exactly %d unique system design interview questions for a %s %s position at %s.%s
+
+CRITICAL: You MUST return ONLY valid JSON. No markdown, no explanations, no code blocks - just pure JSON.
+
+Requirements:
+- Questions should be appropriate for %s level
+- Focus on %s role-specific system design challenges
+- Each question should be a clear, concise prompt (like "Design a machine learning based system to detect fraudulent signals on ads datasets")
+- You can add a brief context or example, but keep it simple - just the question prompt
+- Consider real-world scenarios relevant to %s
+
+For %s level %s roles at %s, consider:
+- %s-specific system design challenges (e.g., distributed systems, microservices, data pipelines, real-time systems)
+- Technologies and patterns commonly used in %s architecture
+- System complexity appropriate for %s level
+
+Return ONLY a JSON array (no markdown, no code blocks, no explanations) with this exact format:
+[
+  {
+    "id": "unique-kebab-case-id",
+    "title": "System Design: [Topic]",
+    "statement": "Design a [system description]. [Optional: brief context or example]",
+    "type": "system_design",
+    "languages": [],
+    "stub": {}
+  }
+]
+
+IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no code blocks, no explanations.`,
+			req.Count, req.Level, req.Role, req.Company, interviewContext, req.Level, req.Role, req.Role, req.Level, req.Role, req.Company, req.Role, req.Role, req.Level)
+	} else {
+		// Coding question prompt
+		defaultLang := req.DefaultLanguage
+		if defaultLang == "" {
+			defaultLang = "python"
+		}
+		languages, stubs := getLanguageConfig(defaultLang)
+		languageList := fmt.Sprintf(`["%s"]`, strings.Join(languages, `", "`))
+		stubTemplates := formatLanguageStubs(languages, stubs)
+		
+		prompt = fmt.Sprintf(`You are a coding interview question generator. Generate exactly %d unique coding interview questions for a %s %s position at %s.%s
 
 CRITICAL: You MUST return ONLY valid JSON. No markdown, no explanations, no code blocks - just pure JSON.
 
@@ -2194,7 +2571,7 @@ Requirements:
 - Include a mix of algorithmic, data structure, and practical problems
 - Each question should have a clear problem statement with examples
 - Include sample input/output examples
-- Provide starter code stubs for Python, Java, and C++
+- Provide starter code stubs for %s (with %s as the primary/default language)
 
 Return ONLY a JSON array (no markdown, no code blocks, no explanations) with this exact format:
 [
@@ -2202,17 +2579,16 @@ Return ONLY a JSON array (no markdown, no code blocks, no explanations) with thi
     "id": "unique-kebab-case-id",
     "title": "Descriptive Title",
     "statement": "Detailed problem description with examples and constraints",
-    "languages": ["python", "java", "cpp"],
+    "type": "coding",
+    "languages": %s,
     "stub": {
-      "python": "def solution():\n    # Your code here\n    pass",
-      "java": "class Solution {\n    public void solution() {\n        // Your code here\n    }\n}",
-      "cpp": "class Solution {\npublic:\n    void solution() {\n        // Your code here\n    }\n};"
-    }
+%s    }
   }
 ]
 
 IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no code blocks, no explanations.`,
-		req.Count, req.Level, req.Role, req.Company, interviewContext, req.Level, req.Role, req.Level)
+			req.Count, req.Level, req.Role, req.Company, interviewContext, req.Level, req.Role, strings.Join(languages, ", "), defaultLang, languageList, stubTemplates)
+	}
 
 	// Prepare request
 	requestBody := map[string]interface{}{
@@ -2297,11 +2673,13 @@ func parseAIResponse(responseText string, req AgentRequest) ([]Problem, error) {
 
 	// Parse the JSON response
 	var aiProblems []struct {
-		ID        string            `json:"id"`
-		Title     string            `json:"title"`
-		Statement string            `json:"statement"`
-		Languages []string          `json:"languages"`
-		Stub      map[string]string `json:"stub"`
+		ID          string            `json:"id"`
+		Title       string            `json:"title"`
+		Statement   string            `json:"statement"`
+		Languages   []string          `json:"languages"`
+		Stub        map[string]string `json:"stub"`
+		Type        string            `json:"type,omitempty"`
+		DrawingData string            `json:"drawingData,omitempty"`
 	}
 
 	if err := json.Unmarshal([]byte(cleanText), &aiProblems); err != nil {
@@ -2326,18 +2704,34 @@ func parseAIResponse(responseText string, req AgentRequest) ([]Problem, error) {
 			aiProblem.Title = fmt.Sprintf("Problem %d", i+1)
 		}
 		if len(aiProblem.Languages) == 0 {
-			aiProblem.Languages = []string{"python", "java", "cpp"}
+			// Use default language configuration
+			defaultLang := req.DefaultLanguage
+			if defaultLang == "" {
+				defaultLang = "python"
+			}
+			languages, _ := getLanguageConfig(defaultLang)
+			aiProblem.Languages = languages
 		}
 		if aiProblem.Stub == nil {
 			aiProblem.Stub = make(map[string]string)
 		}
 
+		problemType := aiProblem.Type
+		if problemType == "" {
+			problemType = req.QuestionType
+		}
+		if problemType == "" {
+			problemType = "coding" // Default to coding
+		}
+
 		problems[i] = Problem{
-			ID:        fmt.Sprintf("%s-%s", baseID, aiProblem.ID),
-			Title:     aiProblem.Title,
-			Statement: aiProblem.Statement,
-			Languages: aiProblem.Languages,
-			Stub:      aiProblem.Stub,
+			ID:          fmt.Sprintf("%s-%s", baseID, aiProblem.ID),
+			Title:       aiProblem.Title,
+			Statement:   aiProblem.Statement,
+			Languages:   aiProblem.Languages,
+			Stub:        aiProblem.Stub,
+			Type:        problemType,
+			DrawingData: aiProblem.DrawingData,
 		}
 	}
 

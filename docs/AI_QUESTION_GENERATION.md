@@ -229,9 +229,15 @@ requestBody := map[string]interface{}{
   "companyDescription": "Optional company info",
   "interviewType": "Technical",
   "provider": "gemini",
-  "apiKey": "optional-api-key"
+  "apiKey": "optional-api-key",
+  "defaultLanguage": "python",
+  "questionType": "coding"
 }
 ```
+
+**Question Types**:
+- `"coding"`: Standard coding interview questions (default)
+- `"system_design"`: System design questions with simple prompts
 
 **Validation**:
 - Company, role, and level are required
@@ -304,6 +310,8 @@ Each generated problem is saved to the filesystem:
 
 ### Base Prompt Structure
 
+#### Coding Questions
+
 ```
 You are a coding interview question generator. Generate exactly {count} unique coding interview questions for a {level} {role} position at {company}.
 
@@ -317,6 +325,35 @@ Requirements:
 - Include sample input/output examples
 - Provide starter code stubs for Python, Java, and C++
 ```
+
+#### System Design Questions
+
+```
+You are a system design interview question generator. Generate exactly {count} unique system design interview questions for a {level} {role} position at {company}.
+
+CRITICAL: You MUST return ONLY valid JSON. No markdown, no explanations, no code blocks - just pure JSON.
+
+Requirements:
+- Questions should be appropriate for {level} level
+- Focus on {role} role-specific system design challenges
+- Each question should be a clear, concise prompt (like "Design a machine learning based system to detect fraudulent signals on ads datasets")
+- You can add a brief context or example, but keep it simple - just the question prompt
+- Consider real-world scenarios relevant to {company}
+
+Return ONLY a JSON array with this exact format:
+[
+  {
+    "id": "unique-kebab-case-id",
+    "title": "System Design: [Topic]",
+    "statement": "Design a [system description]. [Optional: brief context or example]",
+    "type": "system_design",
+    "languages": [],
+    "stub": {}
+  }
+]
+```
+
+**Note**: System design questions use simple, concise prompts without detailed requirements, constraints, or use cases.
 
 ### Enhanced Prompt (with Web Research)
 
@@ -370,12 +407,27 @@ The prompt includes strict JSON format requirements:
     "id": "unique-kebab-case-id",
     "title": "Descriptive Title",
     "statement": "Detailed problem description with examples and constraints",
+    "type": "coding",
     "languages": ["python", "java", "cpp"],
     "stub": {
       "python": "def solution():\n    # Your code here\n    pass",
       "java": "class Solution {\n    public void solution() {\n        // Your code here\n    }\n}",
       "cpp": "class Solution {\npublic:\n    void solution() {\n        // Your code here\n    }\n};"
     }
+  }
+]
+```
+
+**For System Design Questions**:
+```json
+[
+  {
+    "id": "unique-kebab-case-id",
+    "title": "System Design: [Topic]",
+    "statement": "Design a [system description]. [Optional: brief context]",
+    "type": "system_design",
+    "languages": [],
+    "stub": {}
   }
 ]
 ```
@@ -503,11 +555,13 @@ CRITICALLY IMPORTANT INSTRUCTIONS:
 2. **JSON Parsing**:
    ```go
    var aiProblems []struct {
-       ID        string            `json:"id"`
-       Title     string            `json:"title"`
-       Statement string            `json:"statement"`
-       Languages []string          `json:"languages"`
-       Stub      map[string]string `json:"stub"`
+       ID          string            `json:"id"`
+       Title       string            `json:"title"`
+       Statement   string            `json:"statement"`
+       Type        string            `json:"type,omitempty"`
+       Languages   []string          `json:"languages"`
+       Stub        map[string]string `json:"stub"`
+       DrawingData string            `json:"drawingData,omitempty"`
    }
    ```
 
@@ -518,12 +572,22 @@ CRITICALLY IMPORTANT INSTRUCTIONS:
 
 4. **Conversion**:
    ```go
+   problemType := aiProblem.Type
+   if problemType == "" {
+       problemType = req.QuestionType
+   }
+   if problemType == "" {
+       problemType = "coding" // Default to coding
+   }
+   
    problems[i] = Problem{
-       ID:        fmt.Sprintf("%s-%s-%s-%s", company, role, level, aiProblem.ID),
-       Title:     aiProblem.Title,
-       Statement: aiProblem.Statement,
-       Languages: aiProblem.Languages,
-       Stub:      aiProblem.Stub,
+       ID:          fmt.Sprintf("%s-%s-%s-%s", company, role, level, aiProblem.ID),
+       Title:       aiProblem.Title,
+       Statement:   aiProblem.Statement,
+       Type:        problemType,
+       Languages:   aiProblem.Languages,
+       Stub:        aiProblem.Stub,
+       DrawingData: aiProblem.DrawingData,
    }
    ```
 
@@ -595,6 +659,8 @@ ANTHROPIC_API_KEY=your_key_here
 - **jobDescription**: Optional job description
 - **companyDescription**: Optional company info (auto-filled by web search)
 - **interviewType**: Optional interview format
+- **defaultLanguage**: Default programming language for generated questions (default: `"python"`)
+- **questionType**: `"coding"` | `"system_design"` (default: `"coding"`)
 
 ### Model Configuration
 
@@ -631,7 +697,9 @@ ANTHROPIC_API_KEY=your_key_here
   "companyDescription": "string (optional)",
   "interviewType": "string (optional)",
   "provider": "string (gemini|openai|claude, default: gemini)",
-  "apiKey": "string (optional)"
+  "apiKey": "string (optional)",
+  "defaultLanguage": "string (optional, default: python)",
+  "questionType": "string (coding|system_design, default: coding)"
 }
 ```
 
@@ -644,15 +712,36 @@ ANTHROPIC_API_KEY=your_key_here
       "ID": "company-role-level-problem-id",
       "Title": "Problem Title",
       "Statement": "Problem description...",
+      "Type": "coding",
       "Languages": ["python", "java", "cpp"],
       "Stub": {
         "python": "def solution():\n    pass",
         "java": "class Solution {...}",
         "cpp": "class Solution {...}"
-      }
+      },
+      "DrawingData": ""
     }
   ],
   "message": "Generated 5 questions for Senior Software Engineer position at Google"
+}
+```
+
+**For System Design Questions**:
+```json
+{
+  "status": "success",
+  "problems": [
+    {
+      "ID": "company-role-level-problem-id",
+      "Title": "System Design: [Topic]",
+      "Statement": "Design a [system description]...",
+      "Type": "system_design",
+      "Languages": [],
+      "Stub": {},
+      "DrawingData": ""
+    }
+  ],
+  "message": "Generated 3 system design questions for Senior Software Engineer position at Google"
 }
 ```
 

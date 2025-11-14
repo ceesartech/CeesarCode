@@ -2,6 +2,73 @@
 
 ## Recent Updates
 
+### Version 1.4.0 - System Design Questions & Enhanced Features
+
+#### ✨ New Features
+
+1. **System Design Questions with Excalidraw Canvas**
+   - Full support for system design interview questions
+   - Excalidraw canvas appears in main workspace after question creation
+   - Canvas replaces code editor for system design questions
+   - Fullscreen mode for better design experience
+   - Auto-save drawings to backend as you work
+   - Lazy loading with error boundaries for reliability
+   - Works for both manually created and AI-generated questions
+
+2. **Delete Individual Questions**
+   - Delete button (🗑️) on each problem card
+   - Confirmation dialog before deletion
+   - Removes problem directory and all associated files
+   - Clears selection if deleted problem was currently selected
+   - API endpoint: `DELETE /api/problems/{id}`
+
+3. **CeesarCode Logo with Homepage Navigation**
+   - Professional SVG logo with gradient design
+   - Stylized "C" letter with code bracket decorations
+   - "CeesarCode" text with gradient styling
+   - "Technical Interview Practice" subtitle
+   - Clickable - navigates to homepage
+   - Hover effects for better UX
+
+4. **Simplified System Design Prompts**
+   - AI-generated system design questions use simple, concise prompts
+   - Removed detailed functional/non-functional requirements
+   - Example: "Design a machine learning based system to detect fraudulent signals on ads datasets"
+   - Works for all AI providers (Gemini, OpenAI, Claude)
+
+#### 🔧 Improvements
+
+1. **System Design Workflow**
+   - Creation modal simplified (title and statement only)
+   - Canvas appears after question is created and selected
+   - Proper error handling and loading states
+   - Supports both uppercase and lowercase Type fields
+
+2. **Problem Management**
+   - Type badges in problem list ("System Design" badge)
+   - Delete functionality with confirmation
+   - Better state management for problem selection
+
+3. **UI Enhancements**
+   - Logo replaces plain text header
+   - Homepage navigation function
+   - Improved error boundaries
+
+#### 🐛 Bug Fixes
+
+1. **System Design Creation**
+   - Fixed blank screen when selecting System Design type
+   - Fixed infinite loop in Excalidraw onChange handler
+   - Fixed collaborators Map serialization issue
+   - Proper handling of existing system design questions
+
+2. **Delete Functionality**
+   - Fixed 404 errors on delete endpoint
+   - Proper route handling for DELETE requests
+   - URL decoding for problem IDs with special characters
+
+---
+
 ### Version 1.3.0 - UI Enhancements & API Key Management
 
 #### ✨ New Features

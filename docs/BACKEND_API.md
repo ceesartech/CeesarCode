@@ -123,7 +123,9 @@ Creates a new problem.
   "Languages": ["python"],
   "Stub": {
     "python": "def solution():\n    pass"
-  }
+  },
+  "Type": "coding",
+  "DrawingData": ""
 }
 ```
 
@@ -132,6 +134,38 @@ Creates a new problem.
 {
   "status": "success",
   "id": "new-problem"
+}
+```
+
+#### `DELETE /api/problems/{id}`
+Deletes a problem and all associated files.
+
+**Response**:
+```json
+{
+  "status": "success"
+}
+```
+
+**Notes**:
+- Deletes entire problem directory including test cases, uploaded files, and drawings
+- Returns 404 if problem not found
+- Permanent deletion - cannot be undone
+
+#### `PUT /api/problems/{id}/drawing`
+Updates system design drawing data for a problem.
+
+**Request**:
+```json
+{
+  "drawingData": "{\"elements\":[...],\"appState\":{...},\"files\":{...}}"
+}
+```
+
+**Response**:
+```json
+{
+  "status": "success"
 }
 ```
 
@@ -244,11 +278,13 @@ Clears all problems (use with caution).
 
 ```go
 type Problem struct {
-    ID        string            `json:"ID"`
-    Title     string            `json:"Title"`
-    Statement string            `json:"Statement"`
-    Languages []string          `json:"Languages"`
-    Stub      map[string]string `json:"Stub"`
+    ID          string            `json:"ID"`
+    Title       string            `json:"Title"`
+    Statement   string            `json:"Statement"`
+    Languages   []string          `json:"Languages"`
+    Stub        map[string]string `json:"Stub"`
+    Type        string            `json:"Type,omitempty"`        // "coding" or "system_design"
+    DrawingData string            `json:"DrawingData,omitempty"`  // Excalidraw drawing data (JSON string)
 }
 ```
 

@@ -102,12 +102,23 @@ App
 - **Console/Results**: Bottom panel with execution output
 - **Resizable Panels**: Drag borders to adjust sizes
 
+#### Header
+- **Logo**: CeesarCode logo with gradient design
+  - SVG icon with stylized "C" and code brackets
+  - "CeesarCode" text with gradient styling
+  - "Technical Interview Practice" subtitle
+  - Clickable - navigates to homepage
+  - Hover effects for better UX
+- **Action Buttons**: Create Problem, AI Agent
+- **Status Indicator**: Backend connection status
+- **Navigation Controls**: Back, Forward, Refresh buttons
+- **Theme Toggle**: Dark/Light mode
+
 #### Toolbar
 - **Language Selector**: Dropdown for 14+ languages
 - **Run Code**: Quick execution button
 - **Submit Code**: Full test case evaluation
 - **Mode Toggle**: IDE vs Jupyter mode
-- **Theme Toggle**: Dark/Light mode
 
 ### Navigation
 
@@ -115,6 +126,7 @@ App
 - **Problem Selection**: Updates URL and state
 - **Keyboard Shortcuts**: Ctrl+Enter to run
 - **Auto-clear Results**: Clears when switching problems
+- **Logo Navigation**: Click CeesarCode logo to return to homepage
 
 ### Responsive Design
 
@@ -214,26 +226,40 @@ All 14+ languages supported with appropriate syntax highlighting hints.
 ### Problem List
 
 - **Loading**: Fetches from `/api/problems`
-- **Display**: Shows problem titles
+- **Display**: Shows problem titles with type badges
 - **Selection**: Click to load problem
 - **Auto-refresh**: Updates after AI generation
+- **Delete Functionality**: Delete button (🗑️) on each problem card
+- **Type Badges**: "System Design" badge for system design questions
 
 ### Problem Display
 
 - **Title**: Problem name
 - **Statement**: Full problem description
-- **Examples**: Input/output examples
-- **Constraints**: Problem constraints
-- **Languages**: Supported languages
+- **Examples**: Input/output examples (for coding questions)
+- **Constraints**: Problem constraints (for coding questions)
+- **Languages**: Supported languages (for coding questions)
+- **System Design Canvas**: Excalidraw canvas for system design questions
 
 ### Problem Creation
 
 - **UI Form**: Modal with input fields
+- **Question Type**: Dropdown to select "Coding Question" or "System Design Question"
 - **Title**: Problem title
 - **Statement**: Problem description
-- **Languages**: Multi-select dropdown
-- **Stub Code**: Auto-generated templates
-- **Test Cases**: Optional initial test cases
+- **Languages**: Multi-select dropdown (for coding questions only)
+- **Stub Code**: Auto-generated templates (for coding questions only)
+- **System Design Note**: Info message explaining canvas will be available after creation
+
+### System Design Questions
+
+- **Canvas Location**: Appears in main workspace after question creation
+- **Excalidraw Integration**: Full-featured drawing canvas
+- **Fullscreen Mode**: Button to expand canvas to full viewport
+- **Auto-save**: Drawings saved automatically as you work
+- **Error Handling**: Error boundaries with retry functionality
+- **Lazy Loading**: Canvas loads only when needed
+- **Theme Support**: Adapts to dark/light mode
 
 ---
 

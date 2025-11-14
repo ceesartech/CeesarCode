@@ -10,6 +10,7 @@
     "start": "npm run dev"
   },
   "dependencies": {
+    "@excalidraw/excalidraw": "^0.18.0",
     "prismjs": "^1.30.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
