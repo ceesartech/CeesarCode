@@ -90,7 +90,7 @@ Contributions welcome! Please read the documentation first to understand the arc
 
 ## 📄 License
 
-MIT License - Use at will.
+No License
 
 ---
 
