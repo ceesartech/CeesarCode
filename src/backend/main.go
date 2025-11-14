@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -45,12 +46,15 @@ type ExecJob struct {
 }
 
 type AgentRequest struct {
-	Company   string `json:"company"`
-	Role      string `json:"role"`
-	Level     string `json:"level"`
-	Count     int    `json:"count,omitempty"`
-	Provider  string `json:"provider,omitempty"`  // "gemini", "openai", "claude"
-	APIKey    string `json:"apiKey,omitempty"`     // API key from frontend
+	Company           string `json:"company"`
+	Role              string `json:"role"`
+	Level             string `json:"level"`
+	Count             int    `json:"count,omitempty"`
+	JobDescription    string `json:"jobDescription,omitempty"`
+	CompanyDescription string `json:"companyDescription,omitempty"`
+	InterviewType     string `json:"interviewType,omitempty"`
+	Provider          string `json:"provider,omitempty"`  // "gemini", "openai", "claude"
+	APIKey            string `json:"apiKey,omitempty"`     // API key from frontend
 }
 
 type AgentResponse struct {
@@ -1196,6 +1200,492 @@ func generateQuestions(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+// searchWebForPosition performs comprehensive web searches for information about a position at a company
+// to enhance the question generation prompts with extensive context
+func searchWebForPosition(company, role, level string) string {
+	if company == "" || role == "" {
+		return ""
+	}
+
+	log.Printf("Starting comprehensive web search for %s %s position at %s...", level, role, company)
+
+	// Define multiple search queries to gather comprehensive information
+	searchQueries := []string{
+		// Interview questions and patterns
+		fmt.Sprintf("%s %s %s coding interview questions", company, level, role),
+		fmt.Sprintf("%s %s %s technical interview questions", company, level, role),
+		fmt.Sprintf("%s %s interview process coding challenges", company, role),
+		
+		// Technical requirements and skills
+		fmt.Sprintf("%s %s %s job requirements skills technologies", company, level, role),
+		fmt.Sprintf("%s %s technical stack programming languages", company, role),
+		fmt.Sprintf("%s %s %s required skills qualifications", company, level, role),
+		
+		// Company-specific interview information
+		fmt.Sprintf("%s interview experience %s %s", company, level, role),
+		fmt.Sprintf("%s interview tips %s position", company, role),
+		fmt.Sprintf("%s coding interview preparation %s", company, role),
+		
+		// Role-specific technical details
+		fmt.Sprintf("%s %s technologies frameworks tools", company, role),
+		fmt.Sprintf("%s %s %s system design interview", company, level, role),
+		fmt.Sprintf("%s %s algorithm data structure questions", company, role),
+	}
+
+	// Perform searches concurrently with a channel to collect results
+	type searchResult struct {
+		query string
+		info  string
+	}
+	resultChan := make(chan searchResult, len(searchQueries))
+	
+	// Launch concurrent searches
+	for _, query := range searchQueries {
+		go func(q string) {
+			info := performSingleSearch(q, company, role, level)
+			resultChan <- searchResult{query: q, info: info}
+		}(query)
+	}
+
+	// Collect results with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	var allResults []string
+	completed := 0
+	
+	for completed < len(searchQueries) {
+		select {
+		case result := <-resultChan:
+			completed++
+			if result.info != "" {
+				allResults = append(allResults, result.info)
+				log.Printf("Search completed for query: %s (found %d chars)", result.query, len(result.info))
+			}
+		case <-ctx.Done():
+			log.Printf("Web search timeout after %d completed searches", completed)
+			break
+		}
+	}
+
+	// Combine and deduplicate all results
+	combinedInfo := combineSearchResults(allResults, company, role, level)
+	
+	// Increase limit to 8000 chars for comprehensive information
+	if len(combinedInfo) > 8000 {
+		combinedInfo = combinedInfo[:8000] + "..."
+		log.Printf("Comprehensive search results truncated to 8000 chars (original: %d)", len(combinedInfo))
+	}
+
+	log.Printf("Comprehensive web search completed: %d queries, %d chars of information", len(searchQueries), len(combinedInfo))
+	return combinedInfo
+}
+
+// performSingleSearch performs a single web search and extracts information
+func performSingleSearch(searchQuery, company, role, level string) string {
+	// Use DuckDuckGo HTML API (no API key required)
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+
+	// URL encode the search query
+	encodedQuery := url.QueryEscape(searchQuery)
+	searchURL := fmt.Sprintf("https://html.duckduckgo.com/html/?q=%s", encodedQuery)
+
+	// Create HTTP request
+	req, err := http.NewRequestWithContext(ctx, "GET", searchURL, nil)
+	if err != nil {
+		return ""
+	}
+
+	// Set user agent to avoid blocking
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+
+	// Make request
+	client := &http.Client{Timeout: 8 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return ""
+	}
+
+	// Read response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return ""
+	}
+
+	// Extract relevant information from HTML
+	return extractInfoFromHTML(string(body), company, role, level)
+}
+
+// combineSearchResults combines multiple search results, deduplicates, and organizes information
+func combineSearchResults(results []string, company, role, level string) string {
+	if len(results) == 0 {
+		return ""
+	}
+
+	var combined strings.Builder
+	seenSnippets := make(map[string]bool)
+	
+	// Organize information by category
+	var interviewQuestions []string
+	var technicalRequirements []string
+	var technologies []string
+	var interviewProcess []string
+	var generalInfo []string
+
+	// Keywords to categorize information
+	interviewKeywords := []string{"interview", "question", "asked", "coding challenge", "leetcode", "hackerrank"}
+	techKeywords := []string{"technology", "framework", "language", "tool", "stack", "library", "api"}
+	requirementKeywords := []string{"requirement", "skill", "qualification", "experience", "knowledge", "proficiency"}
+	processKeywords := []string{"process", "round", "stage", "format", "structure", "preparation", "tip"}
+
+	for _, result := range results {
+		if result == "" {
+			continue
+		}
+
+		resultLower := strings.ToLower(result)
+		
+		// Categorize the result
+		categorized := false
+		
+		// Check for interview questions
+		for _, keyword := range interviewKeywords {
+			if strings.Contains(resultLower, keyword) {
+				if !seenSnippets[result] {
+					interviewQuestions = append(interviewQuestions, result)
+					seenSnippets[result] = true
+					categorized = true
+					break
+				}
+			}
+		}
+		
+		if !categorized {
+			// Check for technologies
+			for _, keyword := range techKeywords {
+				if strings.Contains(resultLower, keyword) {
+					if !seenSnippets[result] {
+						technologies = append(technologies, result)
+						seenSnippets[result] = true
+						categorized = true
+						break
+					}
+				}
+			}
+		}
+		
+		if !categorized {
+			// Check for requirements
+			for _, keyword := range requirementKeywords {
+				if strings.Contains(resultLower, keyword) {
+					if !seenSnippets[result] {
+						technicalRequirements = append(technicalRequirements, result)
+						seenSnippets[result] = true
+						categorized = true
+						break
+					}
+				}
+			}
+		}
+		
+		if !categorized {
+			// Check for interview process
+			for _, keyword := range processKeywords {
+				if strings.Contains(resultLower, keyword) {
+					if !seenSnippets[result] {
+						interviewProcess = append(interviewProcess, result)
+						seenSnippets[result] = true
+						categorized = true
+						break
+					}
+				}
+			}
+		}
+		
+		// If not categorized, add to general info
+		if !categorized && !seenSnippets[result] {
+			generalInfo = append(generalInfo, result)
+			seenSnippets[result] = true
+		}
+	}
+
+	// Build comprehensive report
+	combined.WriteString(fmt.Sprintf("COMPREHENSIVE RESEARCH FINDINGS FOR %s %s POSITION AT %s\n\n", strings.ToUpper(level), strings.ToUpper(role), strings.ToUpper(company)))
+	
+	if len(interviewQuestions) > 0 {
+		combined.WriteString("=== INTERVIEW QUESTIONS & CODING CHALLENGES ===\n")
+		for i, info := range interviewQuestions {
+			if i < 10 { // Limit to top 10
+				combined.WriteString(fmt.Sprintf("%d. %s\n\n", i+1, truncateText(info, 800)))
+			}
+		}
+		combined.WriteString("\n")
+	}
+	
+	if len(technicalRequirements) > 0 {
+		combined.WriteString("=== TECHNICAL REQUIREMENTS & SKILLS ===\n")
+		for i, info := range technicalRequirements {
+			if i < 8 { // Limit to top 8
+				combined.WriteString(fmt.Sprintf("%d. %s\n\n", i+1, truncateText(info, 600)))
+			}
+		}
+		combined.WriteString("\n")
+	}
+	
+	if len(technologies) > 0 {
+		combined.WriteString("=== TECHNOLOGIES, FRAMEWORKS & TOOLS ===\n")
+		for i, info := range technologies {
+			if i < 8 { // Limit to top 8
+				combined.WriteString(fmt.Sprintf("%d. %s\n\n", i+1, truncateText(info, 600)))
+			}
+		}
+		combined.WriteString("\n")
+	}
+	
+	if len(interviewProcess) > 0 {
+		combined.WriteString("=== INTERVIEW PROCESS & FORMAT ===\n")
+		for i, info := range interviewProcess {
+			if i < 6 { // Limit to top 6
+				combined.WriteString(fmt.Sprintf("%d. %s\n\n", i+1, truncateText(info, 600)))
+			}
+		}
+		combined.WriteString("\n")
+	}
+	
+	if len(generalInfo) > 0 {
+		combined.WriteString("=== ADDITIONAL RELEVANT INFORMATION ===\n")
+		for i, info := range generalInfo {
+			if i < 5 { // Limit to top 5
+				combined.WriteString(fmt.Sprintf("%d. %s\n\n", i+1, truncateText(info, 500)))
+			}
+		}
+	}
+
+	return combined.String()
+}
+
+// truncateText truncates text to a maximum length while trying to end at a word boundary
+func truncateText(text string, maxLen int) string {
+	if len(text) <= maxLen {
+		return text
+	}
+	
+	truncated := text[:maxLen]
+	// Try to find the last space or period to end at a word boundary
+	if lastSpace := strings.LastIndex(truncated, " "); lastSpace > maxLen*3/4 {
+		truncated = truncated[:lastSpace] + "..."
+	} else if lastPeriod := strings.LastIndex(truncated, "."); lastPeriod > maxLen*3/4 {
+		truncated = truncated[:lastPeriod+1]
+	} else {
+		truncated += "..."
+	}
+	return truncated
+}
+
+// extractInfoFromHTML extracts comprehensive relevant information from HTML search results
+func extractInfoFromHTML(html, company, role, level string) string {
+	var info strings.Builder
+	
+	// Remove HTML tags and extract text content
+	re := regexp.MustCompile(`<[^>]*>`)
+	text := re.ReplaceAllString(html, " ")
+	
+	// Remove script and style content
+	re = regexp.MustCompile(`(?i)<script[^>]*>.*?</script>`)
+	text = re.ReplaceAllString(text, " ")
+	re = regexp.MustCompile(`(?i)<style[^>]*>.*?</style>`)
+	text = re.ReplaceAllString(text, " ")
+	
+	// Clean up whitespace and special characters
+	re = regexp.MustCompile(`\s+`)
+	text = re.ReplaceAllString(text, " ")
+	re = regexp.MustCompile(`[^\w\s\.\,\!\?\:\;\-\(\)\[\]\/]`)
+	text = re.ReplaceAllString(text, " ")
+	text = strings.TrimSpace(text)
+	
+	if len(text) == 0 {
+		return ""
+	}
+	
+	// Expanded keywords for comprehensive extraction
+	keywords := []string{
+		strings.ToLower(company),
+		strings.ToLower(role),
+		strings.ToLower(level),
+		"interview",
+		"question",
+		"coding challenge",
+		"leetcode",
+		"hackerrank",
+		"requirement",
+		"skill",
+		"technology",
+		"framework",
+		"language",
+		"tool",
+		"library",
+		"experience",
+		"responsibility",
+		"qualification",
+		"algorithm",
+		"data structure",
+		"system design",
+		"technical",
+		"coding",
+		"programming",
+		"software",
+		"developer",
+		"engineer",
+		"process",
+		"round",
+		"stage",
+		"preparation",
+		"tip",
+		"advice",
+		"pattern",
+		"practice",
+		"problem",
+		"solution",
+		"complexity",
+		"optimization",
+	}
+	
+	// Find all relevant snippets with context
+	textLower := strings.ToLower(text)
+	seenSnippets := make(map[string]bool)
+	var relevantSnippets []string
+	
+	// Extract snippets around each keyword occurrence
+	for _, keyword := range keywords {
+		startPos := 0
+		for {
+			idx := strings.Index(textLower[startPos:], keyword)
+			if idx == -1 {
+				break
+			}
+			actualIdx := startPos + idx
+			
+			// Extract larger context around the keyword (300 chars before, 700 chars after)
+			start := actualIdx - 300
+			if start < 0 {
+				start = 0
+			}
+			end := actualIdx + len(keyword) + 700
+			if end > len(text) {
+				end = len(text)
+			}
+			
+			// Extract snippet
+			snippet := text[start:end]
+			snippet = strings.TrimSpace(snippet)
+			
+			// Clean up snippet - remove very short or very repetitive snippets
+			if len(snippet) > 50 && len(snippet) < 2000 {
+				// Create a normalized version for deduplication (remove case and extra spaces)
+				normalized := strings.ToLower(snippet)
+				normalized = regexp.MustCompile(`\s+`).ReplaceAllString(normalized, " ")
+				
+				if !seenSnippets[normalized] {
+					seenSnippets[normalized] = true
+					relevantSnippets = append(relevantSnippets, snippet)
+				}
+			}
+			
+			// Move past this occurrence
+			startPos = actualIdx + len(keyword)
+			if startPos >= len(text) {
+				break
+			}
+		}
+	}
+	
+	// If we found relevant snippets, use them
+	if len(relevantSnippets) > 0 {
+		// Sort by length (prefer longer, more detailed snippets) and take the best ones
+		// Take up to 15 snippets, prioritizing longer ones
+		maxSnippets := 15
+		if len(relevantSnippets) > maxSnippets {
+			// Simple selection: take snippets distributed across the text
+			step := len(relevantSnippets) / maxSnippets
+			selected := make([]string, 0, maxSnippets)
+			for i := 0; i < len(relevantSnippets) && len(selected) < maxSnippets; i += step {
+				selected = append(selected, relevantSnippets[i])
+			}
+			// Also add the last few snippets
+			if len(relevantSnippets) > maxSnippets {
+				for i := len(relevantSnippets) - (maxSnippets - len(selected)); i < len(relevantSnippets) && len(selected) < maxSnippets; i++ {
+					if i >= 0 {
+						selected = append(selected, relevantSnippets[i])
+					}
+				}
+			}
+			relevantSnippets = selected
+		}
+		
+		// Combine snippets
+		for i, snippet := range relevantSnippets {
+			if i > 0 {
+				info.WriteString(" ")
+			}
+			info.WriteString(snippet)
+			if i < len(relevantSnippets)-1 {
+				info.WriteString(" ... ")
+			}
+		}
+	} else {
+		// Fallback: extract meaningful chunks from the text
+		// Try to find sentences or paragraphs
+		sentences := regexp.MustCompile(`[.!?]\s+`).Split(text, -1)
+		var meaningfulSentences []string
+		
+		for _, sentence := range sentences {
+			sentence = strings.TrimSpace(sentence)
+			if len(sentence) > 30 && len(sentence) < 500 {
+				// Check if sentence contains any relevant terms
+				sentenceLower := strings.ToLower(sentence)
+				for _, keyword := range keywords[:10] { // Check first 10 keywords
+					if strings.Contains(sentenceLower, keyword) {
+						meaningfulSentences = append(meaningfulSentences, sentence)
+						break
+					}
+				}
+			}
+		}
+		
+		if len(meaningfulSentences) > 0 {
+			maxSentences := 10
+			if len(meaningfulSentences) > maxSentences {
+				meaningfulSentences = meaningfulSentences[:maxSentences]
+			}
+			for _, sentence := range meaningfulSentences {
+				info.WriteString(sentence + ". ")
+			}
+		} else {
+			// Last resort: extract first 1000 characters
+			if len(text) > 1000 {
+				info.WriteString(text[:1000] + "...")
+			} else {
+				info.WriteString(text)
+			}
+		}
+	}
+	
+	result := info.String()
+	// Final cleanup
+	result = strings.TrimSpace(result)
+	if len(result) == 0 {
+		return ""
+	}
+	
+	return result
+}
+
 func callAgentAPI(req AgentRequest) ([]Problem, error) {
 	// Determine provider and API key
 	provider := strings.ToLower(req.Provider)
@@ -1203,6 +1693,21 @@ func callAgentAPI(req AgentRequest) ([]Problem, error) {
 		provider = "gemini" // Default to Gemini
 	}
 	log.Printf("callAgentAPI: provider=%s, hasRequestAPIKey=%v", provider, req.APIKey != "")
+	
+	// Perform comprehensive web search for position information to enhance prompts
+	log.Printf("Performing comprehensive web search for %s %s position at %s...", req.Level, req.Role, req.Company)
+	webSearchInfo := searchWebForPosition(req.Company, req.Role, req.Level)
+	if webSearchInfo != "" {
+		log.Printf("Comprehensive web search completed successfully (length: %d chars)", len(webSearchInfo))
+		// Enhance the request with comprehensive web search information
+		if req.CompanyDescription == "" {
+			req.CompanyDescription = webSearchInfo
+		} else {
+			req.CompanyDescription = req.CompanyDescription + "\n\n=== ADDITIONAL COMPREHENSIVE WEB RESEARCH ===\n" + webSearchInfo
+		}
+	} else {
+		log.Printf("Web search did not return additional information")
+	}
 	
 	var apiKey string
 	if req.APIKey != "" {
@@ -1294,7 +1799,23 @@ func generateAIGuestions(req AgentRequest, apiKey string) ([]Problem, error) {
 	log.Printf("Using model: %s", modelName)
 
 	// Create a detailed prompt for the AI with strict JSON format requirement
-	prompt := fmt.Sprintf(`You are a coding interview question generator. Generate exactly %d unique coding interview questions for a %s %s position at %s.
+	interviewContext := ""
+	if req.InterviewType != "" {
+		interviewContext = fmt.Sprintf("\n\nInterview Type/Format: %s\n- Tailor questions specifically for this interview format and style.", req.InterviewType)
+	}
+	if req.JobDescription != "" {
+		interviewContext += fmt.Sprintf("\n\nJob Description:\n%s\n- Use this job description to understand required skills and generate relevant questions.", req.JobDescription)
+	}
+	if req.CompanyDescription != "" {
+		// Check if this contains comprehensive web research information
+		if strings.Contains(req.CompanyDescription, "COMPREHENSIVE RESEARCH FINDINGS") || strings.Contains(req.CompanyDescription, "ADDITIONAL COMPREHENSIVE WEB RESEARCH") || strings.Contains(req.CompanyDescription, "Research findings") || strings.Contains(req.CompanyDescription, "Additional Context from Web Research") {
+			interviewContext += fmt.Sprintf("\n\nCOMPREHENSIVE WEB RESEARCH & COMPANY INFORMATION:\n%s\n\nCRITICALLY IMPORTANT INSTRUCTIONS:\n- This research contains extensive information gathered from multiple web sources about this specific position.\n- Use ALL sections of this research (Interview Questions, Technical Requirements, Technologies, Interview Process) to generate highly accurate and relevant questions.\n- Match the exact technologies, frameworks, and tools mentioned in the research.\n- Align question difficulty and topics with the interview patterns and question types found in the research.\n- Incorporate specific algorithms, data structures, or problem patterns that are commonly asked for this role at this company.\n- Ensure questions reflect the actual interview experience and requirements described in the research.\n- The research includes real interview questions, so create similar but unique variations that test the same concepts.", req.CompanyDescription)
+		} else {
+			interviewContext += fmt.Sprintf("\n\nCompany Information:\n%s\n- Consider this company context when generating questions.", req.CompanyDescription)
+		}
+	}
+	
+	prompt := fmt.Sprintf(`You are a coding interview question generator. Generate exactly %d unique coding interview questions for a %s %s position at %s.%s
 
 CRITICAL: You MUST return ONLY valid JSON. No markdown, no explanations, no code blocks - just pure JSON.
 
@@ -1327,7 +1848,7 @@ Return ONLY a JSON array (no markdown, no code blocks, no explanations) with thi
 ]
 
 IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no code blocks, no explanations.`,
-		req.Count, req.Level, req.Role, req.Company, req.Level, req.Role, req.Level, req.Role, req.Company, req.Role, req.Role, req.Level)
+		req.Count, req.Level, req.Role, req.Company, interviewContext, req.Level, req.Role, req.Level, req.Level, req.Role, req.Company, req.Role, req.Role, req.Level)
 
 	// Retry logic for rate limiting with exponential backoff
 	// Also try different models if one fails
@@ -1516,7 +2037,23 @@ func generateOpenAIQuestions(req AgentRequest, apiKey string) ([]Problem, error)
 	ctx := context.Background()
 	
 	// Create prompt
-	prompt := fmt.Sprintf(`You are a coding interview question generator. Generate exactly %d unique coding interview questions for a %s %s position at %s.
+	interviewContext := ""
+	if req.InterviewType != "" {
+		interviewContext = fmt.Sprintf("\n\nInterview Type/Format: %s\n- Tailor questions specifically for this interview format and style.", req.InterviewType)
+	}
+	if req.JobDescription != "" {
+		interviewContext += fmt.Sprintf("\n\nJob Description:\n%s\n- Use this job description to understand required skills and generate relevant questions.", req.JobDescription)
+	}
+	if req.CompanyDescription != "" {
+		// Check if this contains comprehensive web research information
+		if strings.Contains(req.CompanyDescription, "COMPREHENSIVE RESEARCH FINDINGS") || strings.Contains(req.CompanyDescription, "ADDITIONAL COMPREHENSIVE WEB RESEARCH") || strings.Contains(req.CompanyDescription, "Research findings") || strings.Contains(req.CompanyDescription, "Additional Context from Web Research") {
+			interviewContext += fmt.Sprintf("\n\nCOMPREHENSIVE WEB RESEARCH & COMPANY INFORMATION:\n%s\n\nCRITICALLY IMPORTANT INSTRUCTIONS:\n- This research contains extensive information gathered from multiple web sources about this specific position.\n- Use ALL sections of this research (Interview Questions, Technical Requirements, Technologies, Interview Process) to generate highly accurate and relevant questions.\n- Match the exact technologies, frameworks, and tools mentioned in the research.\n- Align question difficulty and topics with the interview patterns and question types found in the research.\n- Incorporate specific algorithms, data structures, or problem patterns that are commonly asked for this role at this company.\n- Ensure questions reflect the actual interview experience and requirements described in the research.\n- The research includes real interview questions, so create similar but unique variations that test the same concepts.", req.CompanyDescription)
+		} else {
+			interviewContext += fmt.Sprintf("\n\nCompany Information:\n%s\n- Consider this company context when generating questions.", req.CompanyDescription)
+		}
+	}
+	
+	prompt := fmt.Sprintf(`You are a coding interview question generator. Generate exactly %d unique coding interview questions for a %s %s position at %s.%s
 
 CRITICAL: You MUST return ONLY valid JSON. No markdown, no explanations, no code blocks - just pure JSON.
 
@@ -1544,7 +2081,7 @@ Return ONLY a JSON array (no markdown, no code blocks, no explanations) with thi
 ]
 
 IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no code blocks, no explanations.`,
-		req.Count, req.Level, req.Role, req.Company, req.Level, req.Role, req.Level)
+		req.Count, req.Level, req.Role, req.Company, interviewContext, req.Level, req.Role, req.Level)
 
 	// Prepare request
 	requestBody := map[string]interface{}{
@@ -1631,7 +2168,23 @@ func generateClaudeQuestions(req AgentRequest, apiKey string) ([]Problem, error)
 	ctx := context.Background()
 	
 	// Create prompt
-	prompt := fmt.Sprintf(`You are a coding interview question generator. Generate exactly %d unique coding interview questions for a %s %s position at %s.
+	interviewContext := ""
+	if req.InterviewType != "" {
+		interviewContext = fmt.Sprintf("\n\nInterview Type/Format: %s\n- Tailor questions specifically for this interview format and style.", req.InterviewType)
+	}
+	if req.JobDescription != "" {
+		interviewContext += fmt.Sprintf("\n\nJob Description:\n%s\n- Use this job description to understand required skills and generate relevant questions.", req.JobDescription)
+	}
+	if req.CompanyDescription != "" {
+		// Check if this contains comprehensive web research information
+		if strings.Contains(req.CompanyDescription, "COMPREHENSIVE RESEARCH FINDINGS") || strings.Contains(req.CompanyDescription, "ADDITIONAL COMPREHENSIVE WEB RESEARCH") || strings.Contains(req.CompanyDescription, "Research findings") || strings.Contains(req.CompanyDescription, "Additional Context from Web Research") {
+			interviewContext += fmt.Sprintf("\n\nCOMPREHENSIVE WEB RESEARCH & COMPANY INFORMATION:\n%s\n\nCRITICALLY IMPORTANT INSTRUCTIONS:\n- This research contains extensive information gathered from multiple web sources about this specific position.\n- Use ALL sections of this research (Interview Questions, Technical Requirements, Technologies, Interview Process) to generate highly accurate and relevant questions.\n- Match the exact technologies, frameworks, and tools mentioned in the research.\n- Align question difficulty and topics with the interview patterns and question types found in the research.\n- Incorporate specific algorithms, data structures, or problem patterns that are commonly asked for this role at this company.\n- Ensure questions reflect the actual interview experience and requirements described in the research.\n- The research includes real interview questions, so create similar but unique variations that test the same concepts.", req.CompanyDescription)
+		} else {
+			interviewContext += fmt.Sprintf("\n\nCompany Information:\n%s\n- Consider this company context when generating questions.", req.CompanyDescription)
+		}
+	}
+	
+	prompt := fmt.Sprintf(`You are a coding interview question generator. Generate exactly %d unique coding interview questions for a %s %s position at %s.%s
 
 CRITICAL: You MUST return ONLY valid JSON. No markdown, no explanations, no code blocks - just pure JSON.
 
@@ -1659,7 +2212,7 @@ Return ONLY a JSON array (no markdown, no code blocks, no explanations) with thi
 ]
 
 IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no code blocks, no explanations.`,
-		req.Count, req.Level, req.Role, req.Company, req.Level, req.Role, req.Level)
+		req.Count, req.Level, req.Role, req.Company, interviewContext, req.Level, req.Role, req.Level)
 
 	// Prepare request
 	requestBody := map[string]interface{}{

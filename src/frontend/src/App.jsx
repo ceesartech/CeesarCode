@@ -287,6 +287,7 @@ export default function App() {
     count: 3,
     jobDescription: '',
     companyDescription: '',
+    interviewType: '', // Type or description of the interview
     provider: 'gemini', // 'gemini', 'openai', 'claude'
     apiKey: '' // API key from UI (for production)
   })
@@ -747,6 +748,9 @@ export default function App() {
       role: role, // Use the selected or custom role
       level: agentRequest.level,
       count: Math.max(1, Math.min(10, count)),
+      jobDescription: agentRequest.jobDescription || '',
+      companyDescription: agentRequest.companyDescription || '',
+      interviewType: agentRequest.interviewType || '',
       provider: agentRequest.provider || 'gemini',
       apiKey: agentRequest.apiKey || '' // Send API key if provided
     }
@@ -1273,6 +1277,37 @@ export default function App() {
     setShowAutocomplete(false)
   }
 
+  // Scroll textarea to keep cursor visible
+  const scrollToCursor = (textarea, cursorPos) => {
+    if (!textarea) return
+    
+    // Get text before cursor to calculate line number
+    const textBeforeCursor = code.substring(0, cursorPos)
+    const lines = textBeforeCursor.split('\n')
+    const currentLine = lines.length - 1
+    
+    // Calculate line height
+    const lineHeight = parseFloat(getComputedStyle(textarea).lineHeight) || 22.4
+    const textareaPadding = 16
+    
+    // Calculate the position of the current line
+    const lineTop = currentLine * lineHeight + textareaPadding
+    const lineBottom = lineTop + lineHeight
+    
+    // Get visible area
+    const scrollTop = textarea.scrollTop
+    const scrollBottom = scrollTop + textarea.clientHeight
+    
+    // Scroll if cursor line is above or below visible area
+    if (lineTop < scrollTop) {
+      // Cursor is above visible area, scroll up
+      textarea.scrollTop = Math.max(0, lineTop - lineHeight)
+    } else if (lineBottom > scrollBottom) {
+      // Cursor is below visible area, scroll down
+      textarea.scrollTop = lineBottom - textarea.clientHeight + lineHeight
+    }
+  }
+
   // Handle code input changes and trigger autocomplete
   const handleCodeChange = (newCode) => {
     // Get and track cursor position before state update
@@ -1282,6 +1317,8 @@ export default function App() {
       const end = textarea.selectionEnd
       cursorPositionRef.current = { start, end }
       setCursorPosition({ start, end })
+      // Scroll to keep cursor visible while typing
+      scrollToCursor(textarea, start)
     }
     
     setCode(newCode)
@@ -1344,9 +1381,14 @@ export default function App() {
           setAutocompleteSelectedIndex(0)
           setShowAutocomplete(true)
           
-          // Calculate position
-          const position = calculateAutocompletePosition(textarea, wordStart)
-          setAutocompletePosition(position)
+          // Scroll to keep cursor visible
+          scrollToCursor(textarea, cursorPos)
+          
+          // Calculate position (recalculate after scroll)
+          setTimeout(() => {
+            const position = calculateAutocompletePosition(textarea, wordStart)
+            setAutocompletePosition(position)
+          }, 0)
           return
         }
         
@@ -1370,9 +1412,14 @@ export default function App() {
             setAutocompleteSelectedIndex(0)
             setShowAutocomplete(true)
             
-            // Calculate position
-            const position = calculateAutocompletePosition(textarea, wordStart + moduleName.length + 1)
-            setAutocompletePosition(position)
+            // Scroll to keep cursor visible
+            scrollToCursor(textarea, cursorPos)
+            
+            // Calculate position (recalculate after scroll)
+            setTimeout(() => {
+              const position = calculateAutocompletePosition(textarea, wordStart + moduleName.length + 1)
+              setAutocompletePosition(position)
+            }, 0)
             return
           }
         }
@@ -1403,9 +1450,14 @@ export default function App() {
         setAutocompleteSelectedIndex(0)
         setShowAutocomplete(true)
         
-        // Calculate position
-        const position = calculateAutocompletePosition(textarea, wordStart)
-        setAutocompletePosition(position)
+        // Scroll to keep cursor visible
+        scrollToCursor(textarea, cursorPos)
+        
+        // Calculate position (recalculate after scroll)
+        setTimeout(() => {
+          const position = calculateAutocompletePosition(textarea, wordStart)
+          setAutocompletePosition(position)
+        }, 0)
       } else {
         setShowAutocomplete(false)
       }
@@ -1724,15 +1776,40 @@ export default function App() {
     if (openingChar) {
       const afterCursor = code.substring(end)
       
-      // If the next character is already the closing bracket/quote, skip over it
-      // This provides the "smart" behavior where typing ) when ) already exists just moves cursor
+      // If the next character is already the closing bracket/quote, check if we should skip it
+      // Only skip if there are no unmatched opening brackets before the cursor
       if (afterCursor.charAt(0) === e.key) {
-        e.preventDefault()
-        setTimeout(() => {
-          textarea.focus()
-          textarea.setSelectionRange(end + 1, end + 1)
-        }, 0)
-        return
+        // Check if there are unmatched opening brackets before the cursor
+        // This handles cases like (min(1, value)) where we need to close the outer bracket
+        const beforeCursor = code.substring(0, start)
+        let unmatchedOpens = 0
+        
+        // Count unmatched opening brackets from the start
+        for (let i = 0; i < beforeCursor.length; i++) {
+          const char = beforeCursor[i]
+          // Skip escaped characters
+          if (i > 0 && beforeCursor[i - 1] === '\\') {
+            continue
+          }
+          
+          if (char === openingChar) {
+            unmatchedOpens++
+          } else if (char === e.key) {
+            unmatchedOpens = Math.max(0, unmatchedOpens - 1)
+          }
+        }
+        
+        // If there are unmatched opening brackets, we need to close them, so don't skip
+        if (unmatchedOpens === 0) {
+          // No unmatched brackets, skip over the existing closing bracket
+          e.preventDefault()
+          setTimeout(() => {
+            textarea.focus()
+            textarea.setSelectionRange(end + 1, end + 1)
+          }, 0)
+          return
+        }
+        // If unmatchedOpens > 0, allow the bracket to be inserted (fall through to default behavior)
       }
       
       // For quotes: if we're inside a string and type the same quote type, close the string
@@ -1851,47 +1928,80 @@ export default function App() {
       // We don't need special handling for nested brackets, they work naturally
       
       // Check if next character is already the closing character (smart bracket closing)
-      // Only skip if we're NOT inside an empty bracket pair
+      // Only skip if we're NOT inside an empty bracket pair AND there are no unmatched opening brackets
       // If we're inside empty brackets like (), we should allow nesting
       if (afterCursor.charAt(0) === closingChar) {
-        // Check if we're inside an empty bracket pair
-        // Look backwards to find the matching opening bracket
+        // First, check if there are unmatched opening brackets before the cursor
+        // This handles cases like (min(1, value)) where we need to close the outer bracket
         const beforeCursor = code.substring(0, start)
-        let bracketDepth = 0
-        let foundMatchingOpen = false
-        let matchingOpenIndex = -1
+        let unmatchedOpens = 0
         
-        for (let i = beforeCursor.length - 1; i >= 0; i--) {
+        // Count unmatched opening brackets from the start
+        for (let i = 0; i < beforeCursor.length; i++) {
           const char = beforeCursor[i]
           // Skip escaped characters
           if (i > 0 && beforeCursor[i - 1] === '\\') {
             continue
           }
           
-          if (char === closingChar) {
-            bracketDepth++
-          } else if (char === e.key) {
-            if (bracketDepth === 0) {
-              // Found matching opening bracket
-              foundMatchingOpen = true
-              matchingOpenIndex = i
-              break
-            } else {
-              bracketDepth--
-            }
+          if (char === e.key) {
+            unmatchedOpens++
+          } else if (char === closingChar) {
+            unmatchedOpens = Math.max(0, unmatchedOpens - 1)
           }
         }
         
-        if (foundMatchingOpen && matchingOpenIndex !== -1) {
-          // Check if there's any content between the opening bracket and cursor
-          const contentBetween = beforeCursor.substring(matchingOpenIndex + 1)
-          const hasContent = contentBetween.trim().length > 0
+        // If there are unmatched opening brackets, we need to close them, so don't skip
+        if (unmatchedOpens > 0) {
+          // Allow the bracket to be inserted to close an unmatched opening bracket
+          // Continue to insertion logic below
+        } else {
+          // No unmatched brackets, check if we're inside an empty bracket pair
+          // Look backwards to find the matching opening bracket
+          let bracketDepth = 0
+          let foundMatchingOpen = false
+          let matchingOpenIndex = -1
           
-          // If it's an empty bracket pair (no content), allow nesting
-          if (!hasContent) {
-            // Allow the bracket to be inserted (don't skip) - continue to insertion logic below
+          for (let i = beforeCursor.length - 1; i >= 0; i--) {
+            const char = beforeCursor[i]
+            // Skip escaped characters
+            if (i > 0 && beforeCursor[i - 1] === '\\') {
+              continue
+            }
+            
+            if (char === closingChar) {
+              bracketDepth++
+            } else if (char === e.key) {
+              if (bracketDepth === 0) {
+                // Found matching opening bracket
+                foundMatchingOpen = true
+                matchingOpenIndex = i
+                break
+              } else {
+                bracketDepth--
+              }
+            }
+          }
+          
+          if (foundMatchingOpen && matchingOpenIndex !== -1) {
+            // Check if there's any content between the opening bracket and cursor
+            const contentBetween = beforeCursor.substring(matchingOpenIndex + 1)
+            const hasContent = contentBetween.trim().length > 0
+            
+            // If it's an empty bracket pair (no content), allow nesting
+            if (!hasContent) {
+              // Allow the bracket to be inserted (don't skip) - continue to insertion logic below
+            } else {
+              // There's content, so skip over the closing bracket
+              e.preventDefault()
+              setTimeout(() => {
+                textarea.focus()
+                textarea.setSelectionRange(end + 1, end + 1)
+              }, 0)
+              return
+            }
           } else {
-            // There's content, so skip over the closing bracket
+            // No matching bracket found, skip over the closing character
             e.preventDefault()
             setTimeout(() => {
               textarea.focus()
@@ -1899,14 +2009,6 @@ export default function App() {
             }, 0)
             return
           }
-        } else {
-          // No matching bracket found, skip over the closing character
-          e.preventDefault()
-          setTimeout(() => {
-            textarea.focus()
-            textarea.setSelectionRange(end + 1, end + 1)
-          }, 0)
-          return
         }
       }
       
@@ -1984,22 +2086,173 @@ export default function App() {
         }
       }
       
-      // Extract function names
-      const funcPatterns = {
-        python: /^\s*def\s+(\w+)/,
-        javascript: /^\s*(?:function\s+(\w+)|const\s+(\w+)\s*=\s*(?:\(|async\s*\())/,
-        typescript: /^\s*(?:function\s+(\w+)|const\s+(\w+)\s*[:=]\s*(?:\(|async\s*\())/,
-        java: /^\s*(?:\w+\s+)*\w+\s+(\w+)\s*\(/,
-        cpp: /^\s*(?:\w+\s+)*\w+\s+(\w+)\s*\(/,
-        c: /^\s*(?:\w+\s+)*\w+\s+(\w+)\s*\(/
+      // Extract function names and parameters
+      if (language === 'python') {
+        // Python: def func(param1, param2):
+        const funcMatch = trimmed.match(/^\s*def\s+(\w+)\s*\(([^)]*)\)/)
+        if (funcMatch) {
+          const funcName = funcMatch[1]
+          if (funcName) symbols.functions.add(funcName)
+          // Extract parameters
+          const params = funcMatch[2]
+          if (params) {
+            params.split(',').forEach(param => {
+              const paramName = param.trim().split('=')[0].trim().split(':')[0].trim()
+              if (paramName && /^\w+$/.test(paramName)) {
+                symbols.variables.add(paramName)
+              }
+            })
+          }
+        }
+        // Also handle lambda: lambda x, y: ...
+        const lambdaMatch = trimmed.match(/lambda\s+([^:]+):/)
+        if (lambdaMatch) {
+          const params = lambdaMatch[1]
+          params.split(',').forEach(param => {
+            const paramName = param.trim()
+            if (paramName && /^\w+$/.test(paramName)) {
+              symbols.variables.add(paramName)
+            }
+          })
+        }
+      } else if (['javascript', 'typescript'].includes(language)) {
+        // JavaScript/TypeScript: function func(param1, param2) { ... }
+        const funcDeclMatch = trimmed.match(/^\s*function\s+(\w+)\s*\(([^)]*)\)/)
+        if (funcDeclMatch) {
+          const funcName = funcDeclMatch[1]
+          if (funcName) symbols.functions.add(funcName)
+          // Extract parameters
+          const params = funcDeclMatch[2]
+          if (params) {
+            params.split(',').forEach(param => {
+              const paramName = param.trim().split('=')[0].trim().split(':')[0].trim()
+              // Extract simple variable names (not destructured)
+              if (paramName && /^\w+$/.test(paramName)) {
+                symbols.variables.add(paramName)
+              }
+            })
+          }
+        }
+        // Arrow functions: const func = (param1, param2) => or const func = param =>
+        const arrowFuncMatch = trimmed.match(/^\s*(?:const|let|var)\s+(\w+)\s*[:=]\s*(?:async\s*)?(?:\(([^)]+)\)|(\w+))\s*=>/)
+        if (arrowFuncMatch) {
+          const funcName = arrowFuncMatch[1]
+          if (funcName) symbols.functions.add(funcName)
+          // Extract parameters
+          const params = arrowFuncMatch[2] || arrowFuncMatch[3]
+          if (params) {
+            if (arrowFuncMatch[3]) {
+              // Single parameter without parentheses
+              const paramName = params.trim()
+              if (paramName && /^\w+$/.test(paramName)) {
+                symbols.variables.add(paramName)
+              }
+            } else {
+              // Multiple parameters with parentheses
+              params.split(',').forEach(param => {
+                const paramName = param.trim().split('=')[0].trim().split(':')[0].trim()
+                if (paramName && /^\w+$/.test(paramName)) {
+                  symbols.variables.add(paramName)
+                }
+              })
+            }
+          }
+        }
+        // Standalone arrow functions: (param1, param2) => or param =>
+        const arrowMatch = trimmed.match(/^\s*(?:\(([^)]+)\)|(\w+))\s*=>/)
+        if (arrowMatch && !arrowFuncMatch) {
+          const params = arrowMatch[1] || arrowMatch[2]
+          if (params) {
+            if (arrowMatch[2]) {
+              // Single parameter without parentheses
+              const paramName = params.trim()
+              if (paramName && /^\w+$/.test(paramName)) {
+                symbols.variables.add(paramName)
+              }
+            } else {
+              // Multiple parameters with parentheses
+              params.split(',').forEach(param => {
+                const paramName = param.trim().split('=')[0].trim().split(':')[0].trim()
+                if (paramName && /^\w+$/.test(paramName)) {
+                  symbols.variables.add(paramName)
+                }
+              })
+            }
+          }
+        }
+      } else if (['java', 'cpp', 'c'].includes(language)) {
+        // Java/C++/C: returnType funcName(param1, param2)
+        const funcMatch = trimmed.match(/^\s*(?:\w+\s+)*\w+\s+(\w+)\s*\(([^)]*)\)/)
+        if (funcMatch) {
+          const funcName = funcMatch[1]
+          if (funcName) symbols.functions.add(funcName)
+          // Extract parameters
+          const params = funcMatch[2]
+          if (params) {
+            params.split(',').forEach(param => {
+              // Extract variable name from type name pattern
+              const paramParts = param.trim().split(/\s+/)
+              if (paramParts.length >= 2) {
+                const paramName = paramParts[paramParts.length - 1].split('=')[0].trim()
+                if (paramName && /^\w+$/.test(paramName)) {
+                  symbols.variables.add(paramName)
+                }
+              } else if (paramParts.length === 1) {
+                const paramName = paramParts[0].trim()
+                if (paramName && /^\w+$/.test(paramName)) {
+                  symbols.variables.add(paramName)
+                }
+              }
+            })
+          }
+        }
       }
       
-      const funcPattern = funcPatterns[language]
-      if (funcPattern) {
-        const funcMatch = trimmed.match(funcPattern)
-        if (funcMatch) {
-          const funcName = funcMatch[1] || funcMatch[2]
-          if (funcName) symbols.functions.add(funcName)
+      // Extract for loop variables
+      if (language === 'python') {
+        // Python: for item in iterable: or for i, item in enumerate(...):
+        const forMatch = trimmed.match(/^\s*for\s+([^:]+)\s+in\s+/)
+        if (forMatch) {
+          const loopVars = forMatch[1]
+          loopVars.split(',').forEach(varPart => {
+            const varName = varPart.trim()
+            if (varName && /^\w+$/.test(varName)) {
+              symbols.variables.add(varName)
+            }
+          })
+        }
+      } else if (['javascript', 'typescript'].includes(language)) {
+        // JavaScript/TypeScript: for (let i = 0; ...) or for (const item of array) or for (item in object)
+        const forMatch = trimmed.match(/^\s*for\s*\(\s*(?:const|let|var)?\s*(\w+)/)
+        if (forMatch) {
+          const loopVar = forMatch[1]
+          if (loopVar) symbols.variables.add(loopVar)
+        }
+        // Also handle: for (const [key, value] of ...) - extract key and value
+        const forOfMatch = trimmed.match(/^\s*for\s*\(\s*(?:const|let|var)?\s*\[([^\]]+)\]/)
+        if (forOfMatch) {
+          const destructured = forOfMatch[1]
+          destructured.split(',').forEach(varPart => {
+            const varName = varPart.trim()
+            if (varName && /^\w+$/.test(varName)) {
+              symbols.variables.add(varName)
+            }
+          })
+        }
+      } else if (['java', 'cpp', 'c'].includes(language)) {
+        // Java/C++/C: for (int i = 0; ...) or for (Type var : collection)
+        const forMatch = trimmed.match(/^\s*for\s*\(\s*(?:\w+\s+)?(\w+)/)
+        if (forMatch) {
+          const loopVar = forMatch[1]
+          if (loopVar && loopVar !== 'int' && loopVar !== 'long' && loopVar !== 'double' && loopVar !== 'float' && loopVar !== 'char') {
+            symbols.variables.add(loopVar)
+          }
+        }
+        // Enhanced Java for-each: for (Type var : collection)
+        const forEachMatch = trimmed.match(/^\s*for\s*\(\s*\w+\s+(\w+)\s*:/)
+        if (forEachMatch) {
+          const loopVar = forEachMatch[1]
+          if (loopVar) symbols.variables.add(loopVar)
         }
       }
     }
@@ -2301,16 +2554,19 @@ export default function App() {
     const container = textarea.closest('[data-editor-container]')
     if (!container) return { top: 0, left: 0 }
     
-    // Calculate character position
-    const lineHeight = parseFloat(getComputedStyle(textarea).lineHeight) || 22.4
-    const charWidth = 8.4 // Approximate character width for monospace font at 14px
+    // Calculate character position using actual computed styles
+    const computedStyle = getComputedStyle(textarea)
+    const lineHeight = parseFloat(computedStyle.lineHeight) || 22.4
+    const fontSize = parseFloat(computedStyle.fontSize) || 14
+    // For monospace fonts, approximate character width as 60% of font size
+    const charWidth = fontSize * 0.6
     const textareaPadding = 16 // Padding of the textarea
     
-    // Position relative to container (which should have position: relative)
-    // Position BELOW the current line to avoid obstructing typing
-    // Calculate the top position of the current line, then add lineHeight to go below it
+    // Calculate the top position of the NEXT line (below current line)
+    // This ensures autocomplete always appears below the cursor line
     const currentLineTop = currentLine * lineHeight + textareaPadding - textarea.scrollTop
-    const top = currentLineTop + lineHeight + 2 // Position below current line with small gap
+    const nextLineTop = currentLineTop + lineHeight
+    const top = nextLineTop + 4 // Position below current line with small gap
     
     const left = column * charWidth - textarea.scrollLeft + textareaPadding // Account for padding
     
@@ -3958,6 +4214,38 @@ export default function App() {
                   placeholder="Add company information for better context (e.g., tech stack, company culture, etc.)..."
                 />
               </div>
+
+              <div>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '8px',
+                  color: theme.text,
+                  fontSize: '14px',
+                  fontWeight: '600'
+                }}>
+                  Interview Type / Description (Optional)
+                </label>
+                <textarea
+                  value={agentRequest.interviewType}
+                  onChange={(e) => setAgentRequest({...agentRequest, interviewType: e.target.value})}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: '8px',
+                    backgroundColor: theme.background,
+                    color: theme.text,
+                    fontSize: '14px',
+                    transition: 'border-color 0.2s ease',
+                    minHeight: '100px',
+                    resize: 'vertical',
+                    fontFamily: 'inherit'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = theme.primary}
+                  onBlur={(e) => e.target.style.borderColor = theme.border}
+                  placeholder="Describe the interview type or format (e.g., 'Technical phone screen focusing on algorithms', 'On-site system design interview', 'Take-home assignment style', 'Live coding with pair programming', etc.)..."
+                />
+              </div>
             </div>
 
             {agentResult && (
@@ -4662,6 +4950,10 @@ export default function App() {
                         value={code}
                         onChange={(e) => handleCodeChange(e.target.value)}
                         onKeyDown={handleKeyDown}
+                        autoCorrect="off"
+                        autoCapitalize="off"
+                        autoComplete="off"
+                        spellCheck={false}
                         onSelect={(e) => {
                           // Track cursor position on selection changes
                           const textarea = e.target
@@ -4685,6 +4977,8 @@ export default function App() {
                           const end = textarea.selectionEnd
                           cursorPositionRef.current = { start, end }
                           setCursorPosition({ start, end })
+                          // Scroll to keep cursor visible
+                          scrollToCursor(textarea, start)
                         }}
                               style={{
                                 width: '100%',

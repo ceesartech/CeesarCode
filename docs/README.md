@@ -2,7 +2,27 @@
 # CeesarCode — Unified Multi‑Language Judge
 > An end‑to‑end, LeetCode/CodeSignal‑style coding judge you can run locally or in prod (Docker or Firecracker).
 
+## 📚 Documentation Index
+
+### Core Component Documentation
+- **[Backend API](./BACKEND_API.md)** - Complete REST API documentation, endpoints, request/response formats, code execution flow, and error handling
+- **[Frontend UI](./FRONTEND_UI.md)** - React application architecture, UI components, state management, code editor, and theming system
+- **[AI Question Generation](./AI_QUESTION_GENERATION.md)** - Complete AI system documentation including setup, provider integration (Gemini/OpenAI/Claude), web search feature (12 concurrent searches), prompt engineering, response parsing, and troubleshooting
+
+### Setup & Configuration Guides
+- **[Language Setup](./LANGUAGE_SETUP.md)** - Complete language installation guide, configuration, performance benchmarks, and troubleshooting for all 14+ supported programming languages
+- **[Production Deployment](./PRODUCTION_DEPLOYMENT.md)** - Complete production deployment guide including Docker setup, Firecracker configuration, production checklist, verification, and system requirements
+
+### Project Information
+- **[Project Structure](./PROJECT_STRUCTURE.md)** - Detailed directory structure, file organization, and component locations
+- **[Features](./FEATURES.md)** - Complete feature list with descriptions
+- **[Changelog](./CHANGELOG.md)** - Version history and updates
+
+
+---
+
 ## 📋 Table of Contents
+- [Documentation Index](#-documentation-index)
 - [Quick Start](#-quickstart-2-3-minutes-demo-mode)
 - [Features](#-ui-features)
 - [API Key Configuration](#api-key-configuration)
@@ -28,10 +48,11 @@
 - **File Upload System** — Upload datasets and files for ML/Data Science problems with proper handling.
 - **Cross-Platform** — Works on Windows, Mac, and Linux with proper path handling and dependencies.
 - **Problem bundles** — examples for Python/C++ (`float-mean`), Shell (`shell-hello`), SQL (`top-customers-sql`), and ML (`ml-iris-classification`).
-- **🤖 AI Question Generator** — Generate unique, contextual coding interview questions based on company, role, and experience level using Google Gemini AI.
+- **🤖 AI Question Generator** — Generate unique, contextual coding interview questions based on company, role, and experience level using Google Gemini, OpenAI, or Claude AI.
+- **🔍 Comprehensive Web Search** — Automatically performs 12 concurrent web searches to gather detailed information about positions, interview questions, technical requirements, and company-specific details to generate highly accurate questions.
 
 > ✅ **NEW:** Real code execution is now implemented! The executor actually compiles and runs user code, validates outputs against test cases, and provides detailed results including execution time and error messages.
-> ✅ **NEW:** AI Question Generator! Create unique, contextual coding interview questions tailored to specific companies, roles, and experience levels.
+> ✅ **NEW:** AI Question Generator with Web Research! Automatically searches the web for comprehensive position information (interview questions, technical requirements, technologies, interview process) and uses this data to generate highly accurate, contextually relevant questions.
 
 ---
 
@@ -58,12 +79,19 @@
   - **Jupyter Mode**: Interactive cell-based coding with data upload support
 
 ### **Advanced Features**
-- **🤖 AI Question Generator** — Generate unique, contextual coding interview questions:
+- **🤖 AI Question Generator with Web Research** — Generate unique, contextual coding interview questions:
+  - **Comprehensive Web Research** — Automatically performs 12 concurrent searches for:
+    - Actual interview questions asked at the company
+    - Required technologies, frameworks, and tools
+    - Technical requirements and skills
+    - Interview process and format
+    - Company-specific expectations
   - **Company-specific** — Netflix streaming, Uber routing, Google data processing
   - **Role-specific** — Backend orchestration, Frontend optimization, Data engineering
   - **Level-appropriate** — Junior vs Senior complexity
   - **Varied problem types** — Algorithms, system design, debugging, etc.
-  - **Free AI integration** — Uses Google Gemini (free tier, no payment required)
+  - **Multiple AI Providers** — Google Gemini (free tier), OpenAI GPT, Anthropic Claude
+  - **Intelligent Prompting** — Uses web research to create highly accurate, relevant questions
 - **Jupyter Notebook Mode** — Interactive cell-based coding with enhanced features:
   - Run individual cells
   - Run all cells sequentially
@@ -897,10 +925,15 @@ Use the "📝 Upload Questions" button to upload multiple questions from a JSON 
 
 ## 📚 Additional Documentation
 
+For comprehensive documentation on each component, see:
+
+- **[Backend API Documentation](./BACKEND_API.md)** - Complete API reference with all endpoints, request/response formats, and integration details
+- **[Frontend UI Documentation](./FRONTEND_UI.md)** - Detailed UI component documentation, state management, and feature guides
+- **[AI Question Generation](./AI_QUESTION_GENERATION.md)** - Complete guide including setup, all three AI providers, web search feature (12 concurrent searches), prompt engineering, and troubleshooting
+- **[LANGUAGE_SETUP.md](./LANGUAGE_SETUP.md)** - Complete language installation guide with performance benchmarks and troubleshooting
+- **[PRODUCTION_DEPLOYMENT.md](./PRODUCTION_DEPLOYMENT.md)** - Complete production deployment guide with Docker setup, checklist, and verification
 - **[CHANGELOG.md](./CHANGELOG.md)** - Detailed changelog of all changes and updates
 - **[PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md)** - Detailed project structure and file organization
-- **[LANGUAGE_SETUP.md](./LANGUAGE_SETUP.md)** - Language installation and setup guide
-- **[PRODUCTION_DEPLOYMENT.md](./PRODUCTION_DEPLOYMENT.md)** - Production deployment instructions
 
 ---
 
