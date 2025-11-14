@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 
 const styles = {
   light: {
@@ -315,6 +315,19 @@ export default function App() {
     const saved = localStorage.getItem('ceesarcode-console-height')
     return saved ? parseInt(saved) : 200
   })
+  // Autocomplete state
+  const [autocompleteSuggestions, setAutocompleteSuggestions] = useState([])
+  const [autocompletePosition, setAutocompletePosition] = useState({ top: 0, left: 0 })
+  const [autocompleteSelectedIndex, setAutocompleteSelectedIndex] = useState(0)
+  const [showAutocomplete, setShowAutocomplete] = useState(false)
+  const [autocompletePrefix, setAutocompletePrefix] = useState('')
+  const [autocompleteWordStart, setAutocompleteWordStart] = useState(0)
+  const [autocompleteWordEnd, setAutocompleteWordEnd] = useState(0)
+  
+  // Cursor position tracking
+  const [cursorPosition, setCursorPosition] = useState({ start: 0, end: 0 })
+  const cursorPositionRef = useRef({ start: 0, end: 0 })
+
   const [consoleCollapsed, setConsoleCollapsed] = useState(() => {
     const saved = localStorage.getItem('ceesarcode-console-collapsed')
     return saved ? JSON.parse(saved) : false
@@ -1124,14 +1137,43 @@ export default function App() {
   }
 
   const handleKeyDown = (e) => {
-    // Handle Tab key for indentation
-    if (e.key === 'Tab') {
+    // Handle autocomplete navigation
+    if (showAutocomplete && autocompleteSuggestions.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setAutocompleteSelectedIndex(prev => 
+          prev < autocompleteSuggestions.length - 1 ? prev + 1 : prev
+        )
+        return
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setAutocompleteSelectedIndex(prev => prev > 0 ? prev - 1 : 0)
+        return
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault()
+        const selected = autocompleteSuggestions[autocompleteSelectedIndex]
+        if (selected) {
+          applyAutocomplete(selected)
+        }
+        return
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setShowAutocomplete(false)
+        return
+      }
+    }
+    
+    // Handle Tab key for indentation (only if autocomplete is not showing)
+    if (e.key === 'Tab' && !showAutocomplete) {
       handleTabKey(e)
       return
     }
     
-    // Handle Enter key for auto-indentation
-    if (e.key === 'Enter') {
+    // Handle Enter key for auto-indentation (only if autocomplete is not showing)
+    if (e.key === 'Enter' && !showAutocomplete) {
       handleEnterKey(e)
       return
     }
@@ -1142,8 +1184,9 @@ export default function App() {
       return
     }
     
-    // Handle auto-closing brackets and parentheses
-    if (['(', '[', '{', '"', "'"].includes(e.key)) {
+    // Handle auto-closing brackets, parentheses, and quotes
+    // Also handle smart skipping of closing brackets/quotes
+    if (['(', '[', '{', '"', "'", ')', ']', '}'].includes(e.key)) {
       handleAutoClose(e)
       return
     }
@@ -1185,8 +1228,8 @@ export default function App() {
       return
     }
     
-    // Handle Escape to go back to problems list
-    if (e.key === 'Escape' && selectedProblem) {
+    // Handle Escape to go back to problems list (only if autocomplete is not showing)
+    if (e.key === 'Escape' && selectedProblem && !showAutocomplete) {
       setSelectedProblem(null)
       return
     }
@@ -1197,6 +1240,176 @@ export default function App() {
       setShowShortcuts(true)
       return
     }
+  }
+
+  // Apply autocomplete suggestion
+  const applyAutocomplete = (suggestion) => {
+    const textarea = document.querySelector('textarea')
+    if (!textarea) return
+    
+    const start = autocompleteWordStart
+    const end = autocompleteWordEnd
+    
+    // Replace the prefix with the full suggestion
+    const newCode = code.substring(0, start) + suggestion.value + code.substring(end)
+    
+    // If it's a module that needs import, add the import
+    let finalCode = newCode
+    if (suggestion.needsImport) {
+      finalCode = addImportIfNeeded(suggestion.value, selectedLanguage, newCode)
+    }
+    
+    setCode(finalCode)
+    
+    // Update cursor position
+    const newCursorPos = start + suggestion.value.length
+    
+    setTimeout(() => {
+      textarea.focus()
+      textarea.setSelectionRange(newCursorPos, newCursorPos)
+    }, 0)
+    
+    // Hide autocomplete
+    setShowAutocomplete(false)
+  }
+
+  // Handle code input changes and trigger autocomplete
+  const handleCodeChange = (newCode) => {
+    // Get and track cursor position before state update
+    const textarea = document.querySelector('textarea')
+    if (textarea) {
+      const start = textarea.selectionStart
+      const end = textarea.selectionEnd
+      cursorPositionRef.current = { start, end }
+      setCursorPosition({ start, end })
+    }
+    
+    setCode(newCode)
+    
+    // Use setTimeout to ensure DOM is updated and we can get cursor position
+    setTimeout(() => {
+      // Get cursor position
+      const textarea = document.querySelector('textarea')
+      if (!textarea) {
+        setShowAutocomplete(false)
+        return
+      }
+      
+      // Track current cursor position (browser maintains it during typing)
+      const currentStart = textarea.selectionStart
+      const currentEnd = textarea.selectionEnd
+      cursorPositionRef.current = { start: currentStart, end: currentEnd }
+      setCursorPosition({ start: currentStart, end: currentEnd })
+      
+      const cursorPos = currentStart
+      
+      // Find the current word being typed
+      const textBeforeCursor = newCode.substring(0, cursorPos)
+      const textAfterCursor = newCode.substring(cursorPos)
+      
+      // Match word characters and dots (for module.function patterns)
+      const wordMatch = textBeforeCursor.match(/[\w.]+$/)
+      if (!wordMatch) {
+        setShowAutocomplete(false)
+        return
+      }
+      
+      const currentWord = wordMatch[0]
+      const wordStart = cursorPos - currentWord.length
+      
+      // Check for module.function pattern (e.g., heapq.push or heapq.)
+      // This needs to be checked BEFORE the "still typing" check so we can show suggestions after the dot
+      const moduleFunctionMatch = currentWord.match(/^(\w+)\.(\w*)$/)
+      if (moduleFunctionMatch) {
+        const moduleName = moduleFunctionMatch[1]
+        const functionPrefix = moduleFunctionMatch[2] || ''
+        
+        // Check if module is imported or is a standard library module
+        const symbols = extractCodeSymbols(newCode, selectedLanguage)
+        const isImported = symbols.imports.has(moduleName)
+        const isStandardLib = selectedLanguage === 'python' && getPythonStandardModules().includes(moduleName)
+        
+        if (!isImported && !isStandardLib && selectedLanguage === 'python') {
+          // Module not imported and not standard library, suggest importing it
+          const suggestions = [{
+            type: 'module',
+            value: moduleName,
+            label: `${moduleName} (import)`,
+            needsImport: true
+          }]
+          setAutocompleteSuggestions(suggestions)
+          setAutocompletePrefix(moduleName)
+          setAutocompleteWordStart(wordStart)
+          setAutocompleteWordEnd(cursorPos)
+          setAutocompleteSelectedIndex(0)
+          setShowAutocomplete(true)
+          
+          // Calculate position
+          const position = calculateAutocompletePosition(textarea, wordStart)
+          setAutocompletePosition(position)
+          return
+        }
+        
+        // Module is imported or is standard library - show function suggestions
+        if ((isImported || isStandardLib) && selectedLanguage === 'python') {
+          const moduleMembers = getPythonModuleMembers(moduleName)
+          const suggestions = moduleMembers
+            .filter(member => member.toLowerCase().startsWith(functionPrefix.toLowerCase()))
+            .map(member => ({
+              type: 'function',
+              value: member,
+              label: member,
+              module: moduleName
+            }))
+          
+          if (suggestions.length > 0) {
+            setAutocompleteSuggestions(suggestions)
+            setAutocompletePrefix(functionPrefix || moduleName + '.')
+            setAutocompleteWordStart(wordStart + moduleName.length + 1) // Start after the dot
+            setAutocompleteWordEnd(cursorPos)
+            setAutocompleteSelectedIndex(0)
+            setShowAutocomplete(true)
+            
+            // Calculate position
+            const position = calculateAutocompletePosition(textarea, wordStart + moduleName.length + 1)
+            setAutocompletePosition(position)
+            return
+          }
+        }
+      }
+      
+      // Check if we're in the middle of typing a word (not at end of line/statement)
+      const nextChar = textAfterCursor.charAt(0)
+      if (nextChar && /[\w.]/.test(nextChar)) {
+        // Still typing, don't show autocomplete
+        setShowAutocomplete(false)
+        return
+      }
+      
+      // Only show autocomplete if we have at least 1 character
+      if (currentWord.length < 1) {
+        setShowAutocomplete(false)
+        return
+      }
+      
+      // Get suggestions
+      const suggestions = getAutocompleteSuggestions(currentWord, selectedLanguage, newCode)
+      
+      if (suggestions.length > 0) {
+        setAutocompleteSuggestions(suggestions)
+        setAutocompletePrefix(currentWord)
+        setAutocompleteWordStart(wordStart)
+        setAutocompleteWordEnd(cursorPos)
+        setAutocompleteSelectedIndex(0)
+        setShowAutocomplete(true)
+        
+        // Calculate position
+        const position = calculateAutocompletePosition(textarea, wordStart)
+        setAutocompletePosition(position)
+      } else {
+        setShowAutocomplete(false)
+      }
+    }, 0)
   }
 
   const handleSmartBackspace = (e) => {
@@ -1385,10 +1598,108 @@ export default function App() {
     return patterns.some(pattern => pattern.test(line))
   }
 
+  // Check if we're inside a comment (for context awareness)
+  const isInsideComment = (text, position, language) => {
+    const beforeCursor = text.substring(0, position)
+    const lines = beforeCursor.split('\n')
+    const currentLine = lines[lines.length - 1] || ''
+    
+    // Check for single-line comments
+    const commentPatterns = {
+      python: /#/,
+      javascript: /\/\/|\/\*/,
+      typescript: /\/\/|\/\*/,
+      java: /\/\/|\/\*/,
+      cpp: /\/\/|\/\*/,
+      c: /\/\/|\/\*/,
+      go: /\/\/|\/\*/,
+      rust: /\/\/|\/\*/,
+      ruby: /#/,
+      bash: /#/,
+      sh: /#/
+    }
+    
+    const pattern = commentPatterns[language]
+    if (!pattern) return false
+    
+    // Check if there's a comment marker before the cursor on this line
+    const commentMatch = currentLine.match(pattern)
+    if (commentMatch) {
+      const commentIndex = currentLine.indexOf(commentMatch[0])
+      const cursorInLine = currentLine.length
+      // If comment is before cursor, we're in a comment
+      if (commentIndex < cursorInLine) {
+        // For multi-line comments, check if we're inside one
+        if (commentMatch[0] === '/*') {
+          const textBefore = text.substring(0, position)
+          const lastOpen = textBefore.lastIndexOf('/*')
+          const lastClose = textBefore.lastIndexOf('*/')
+          return lastOpen > lastClose
+        }
+        return true
+      }
+    }
+    
+    return false
+  }
+
+  // Check if we're inside a string (better context awareness)
+  const isInsideString = (text, position, quoteChar) => {
+    const beforeCursor = text.substring(0, position)
+    
+    // Count unescaped quotes before cursor
+    let quoteCount = 0
+    let i = 0
+    while (i < beforeCursor.length) {
+      if (beforeCursor[i] === quoteChar && (i === 0 || beforeCursor[i-1] !== '\\')) {
+        quoteCount++
+      }
+      i++
+    }
+    
+    // If odd number of quotes, we're inside a string
+    return quoteCount % 2 === 1
+  }
+
+  // Find the matching closing bracket/quote position
+  const findMatchingClose = (text, position, openChar, closeChar) => {
+    let depth = 1
+    let i = position + 1
+    
+    while (i < text.length && depth > 0) {
+      const char = text[i]
+      const prevChar = i > 0 ? text[i - 1] : ''
+      
+      // Skip escaped characters
+      if (prevChar === '\\') {
+        i++
+        continue
+      }
+      
+      if (char === openChar) {
+        depth++
+      } else if (char === closeChar) {
+        depth--
+        if (depth === 0) {
+          return i
+        }
+      }
+      
+      i++
+    }
+    
+    return -1 // No matching close found
+  }
+
   const handleAutoClose = (e) => {
     const textarea = e.target
     const start = textarea.selectionStart
     const end = textarea.selectionEnd
+    
+    // Don't auto-close if there's a selection
+    if (start !== end) {
+      return
+    }
     
     const openingChars = {
       '(': ')',
@@ -1398,71 +1709,219 @@ export default function App() {
       "'": "'"
     }
     
-    const closingChar = openingChars[e.key]
-    if (!closingChar) return
+    const closingChars = {
+      ')': '(',
+      ']': '[',
+      '}': '{',
+      '"': '"',
+      "'": "'"
+    }
     
-    // Check if we're already inside quotes
-    if (e.key === '"' || e.key === "'") {
-      const beforeCursor = code.substring(0, start)
+    const closingChar = openingChars[e.key]
+    const openingChar = closingChars[e.key]
+    
+    // Handle closing brackets/quotes (when user types a closing character)
+    if (openingChar) {
       const afterCursor = code.substring(end)
       
-      // Count unescaped quotes before cursor
-      let quoteCount = 0
-      let i = beforeCursor.length - 1
-      while (i >= 0) {
-        if (beforeCursor[i] === e.key && (i === 0 || beforeCursor[i-1] !== '\\')) {
-          quoteCount++
-        }
-        i--
-      }
-      
-      // If we're inside quotes, just insert the quote
-      if (quoteCount % 2 === 1) {
+      // If the next character is already the closing bracket/quote, skip over it
+      // This provides the "smart" behavior where typing ) when ) already exists just moves cursor
+      if (afterCursor.charAt(0) === e.key) {
         e.preventDefault()
-        const newCode = code.substring(0, start) + e.key + code.substring(end)
-        setCode(newCode)
         setTimeout(() => {
           textarea.focus()
-          textarea.setSelectionRange(start + 1, start + 1)
+          textarea.setSelectionRange(end + 1, end + 1)
         }, 0)
         return
       }
+      
+      // For quotes: if we're inside a string and type the same quote type, close the string
+      if ((e.key === '"' || e.key === "'") && isInsideString(code, start, e.key)) {
+        // Find the opening quote before cursor
+        let openQuotePos = -1
+        for (let i = start - 1; i >= 0; i--) {
+          if (code[i] === e.key && (i === 0 || code[i - 1] !== '\\')) {
+            openQuotePos = i
+            break
+          }
+        }
+        
+        if (openQuotePos !== -1) {
+          // Find the matching closing quote after the opening quote
+          const matchingClosePos = findMatchingClose(code, openQuotePos, e.key, e.key)
+          if (matchingClosePos !== -1 && matchingClosePos >= start) {
+            // Move cursor to after the closing quote
+            e.preventDefault()
+            setTimeout(() => {
+              textarea.focus()
+              textarea.setSelectionRange(matchingClosePos + 1, matchingClosePos + 1)
+            }, 0)
+            return
+          }
+        }
+        // If no matching close found, just insert the quote (close the string)
+        return // Let default behavior happen
+      }
     }
     
-    // Check if next character is already the closing character (smart bracket closing)
-    const afterCursor = code.substring(end)
-    if (afterCursor.charAt(0) === closingChar) {
-      // Just move cursor past the existing closing character
+    // Handle opening brackets/quotes
+    if (closingChar) {
+      // Don't auto-close in comments
+      if (isInsideComment(code, start, selectedLanguage)) {
+        return
+      }
+      
+      const afterCursor = code.substring(end)
+      
+      // For quotes, handle nested quote scenarios (works for all languages)
+      if (e.key === '"' || e.key === "'") {
+        const insideString = isInsideString(code, start, e.key)
+        
+        // If we're inside a string with the same quote type
+        if (insideString) {
+          // If next char is the closing quote, check if it's an empty quote pair
+          if (afterCursor.charAt(0) === e.key) {
+            // Check if we're inside an empty quote pair
+            // Look backwards to find the matching opening quote
+            const beforeCursor = code.substring(0, start)
+            let foundMatchingOpen = false
+            let matchingOpenIndex = -1
+            
+            // Count unescaped quotes backwards from cursor
+            for (let i = beforeCursor.length - 1; i >= 0; i--) {
+              const char = beforeCursor[i]
+              // Skip escaped characters
+              if (i > 0 && beforeCursor[i - 1] === '\\') {
+                continue
+              }
+              
+              if (char === e.key) {
+                // Found matching opening quote
+                foundMatchingOpen = true
+                matchingOpenIndex = i
+                break
+              }
+            }
+            
+            if (foundMatchingOpen && matchingOpenIndex !== -1) {
+              // Check if there's any content between the opening quote and cursor
+              const contentBetween = beforeCursor.substring(matchingOpenIndex + 1)
+              const hasContent = contentBetween.trim().length > 0
+              
+              // If it's an empty quote pair (no content), allow nesting
+              if (!hasContent) {
+                // Allow the quote to be inserted (don't skip) - continue to insertion logic below
+              } else {
+                // There's content, so skip over the closing quote
+                e.preventDefault()
+                setTimeout(() => {
+                  textarea.focus()
+                  textarea.setSelectionRange(end + 1, end + 1)
+                }, 0)
+                return
+              }
+            } else {
+              // No matching quote found, skip over the closing quote
+              e.preventDefault()
+              setTimeout(() => {
+                textarea.focus()
+                textarea.setSelectionRange(end + 1, end + 1)
+              }, 0)
+              return
+            }
+          } else {
+            // Next char is not the closing quote, we're inside a string - don't auto-close
+            // This allows for escaped quotes or different quote types
+            return // Let the default behavior happen
+          }
+        }
+        
+        // Check if we're inside a string with a different quote type
+        // In that case, we can auto-close normally (e.g., 'he"llo' -> 'he""llo')
+        const insideOtherString = (e.key === '"' && isInsideString(code, start, "'")) ||
+                                   (e.key === "'" && isInsideString(code, start, '"'))
+        if (insideOtherString) {
+          // Different quote type, so we can auto-close normally
+          // Continue to the auto-close logic below
+        }
+      }
+      
+      // For brackets: check if we're inside brackets of the same type
+      // Nested brackets should work - e.g., (he(llo)) should allow (he(()llo))
+      // We don't need special handling for nested brackets, they work naturally
+      
+      // Check if next character is already the closing character (smart bracket closing)
+      // Only skip if we're NOT inside an empty bracket pair
+      // If we're inside empty brackets like (), we should allow nesting
+      if (afterCursor.charAt(0) === closingChar) {
+        // Check if we're inside an empty bracket pair
+        // Look backwards to find the matching opening bracket
+        const beforeCursor = code.substring(0, start)
+        let bracketDepth = 0
+        let foundMatchingOpen = false
+        let matchingOpenIndex = -1
+        
+        for (let i = beforeCursor.length - 1; i >= 0; i--) {
+          const char = beforeCursor[i]
+          // Skip escaped characters
+          if (i > 0 && beforeCursor[i - 1] === '\\') {
+            continue
+          }
+          
+          if (char === closingChar) {
+            bracketDepth++
+          } else if (char === e.key) {
+            if (bracketDepth === 0) {
+              // Found matching opening bracket
+              foundMatchingOpen = true
+              matchingOpenIndex = i
+              break
+            } else {
+              bracketDepth--
+            }
+          }
+        }
+        
+        if (foundMatchingOpen && matchingOpenIndex !== -1) {
+          // Check if there's any content between the opening bracket and cursor
+          const contentBetween = beforeCursor.substring(matchingOpenIndex + 1)
+          const hasContent = contentBetween.trim().length > 0
+          
+          // If it's an empty bracket pair (no content), allow nesting
+          if (!hasContent) {
+            // Allow the bracket to be inserted (don't skip) - continue to insertion logic below
+          } else {
+            // There's content, so skip over the closing bracket
+            e.preventDefault()
+            setTimeout(() => {
+              textarea.focus()
+              textarea.setSelectionRange(end + 1, end + 1)
+            }, 0)
+            return
+          }
+        } else {
+          // No matching bracket found, skip over the closing character
+          e.preventDefault()
+          setTimeout(() => {
+            textarea.focus()
+            textarea.setSelectionRange(end + 1, end + 1)
+          }, 0)
+          return
+        }
+      }
+      
+      // Insert opening and closing characters
+      // This works for nested brackets: (hello) -> (he()llo) when typing ( inside
       e.preventDefault()
+      const newCode = code.substring(0, start) + e.key + closingChar + code.substring(end)
+      setCode(newCode)
+      
+      // Set cursor position between the brackets/quotes
       setTimeout(() => {
         textarea.focus()
-        textarea.setSelectionRange(end + 1, end + 1)
+        textarea.setSelectionRange(start + 1, start + 1)
       }, 0)
-      return
     }
-    
-    // Check if user is trying to type a closing bracket and there's already one there
-    const closingBrackets = { ')': '(', ']': '[', '}': '{' }
-    if (closingBrackets[e.key] && afterCursor.charAt(0) === e.key) {
-      // Skip over the existing closing bracket
-      e.preventDefault()
-      setTimeout(() => {
-        textarea.focus()
-        textarea.setSelectionRange(end + 1, end + 1)
-      }, 0)
-      return
-    }
-    
-    // Insert opening and closing characters
-    e.preventDefault()
-    const newCode = code.substring(0, start) + e.key + closingChar + code.substring(end)
-    setCode(newCode)
-    
-    // Set cursor position between the brackets
-    setTimeout(() => {
-      textarea.focus()
-      textarea.setSelectionRange(start + 1, start + 1)
-    }, 0)
   }
 
   // Extract variables and imports from code
@@ -1573,15 +2032,7 @@ export default function App() {
       }
     }
     
-    // Try template completion for common patterns
-    const templates = getLanguageTemplates(language)
-    const templateMatch = templates.find(template => 
-      template.trigger.toLowerCase().startsWith(word.toLowerCase())
-    )
-    
-    if (templateMatch) {
-      return templateMatch.template
-    }
+    // Template completion removed - no more autocorrect behavior
     
     return null
   }
@@ -1659,6 +2110,298 @@ export default function App() {
     return prefix
   }
 
+  // Get standard library modules for Python
+  const getPythonStandardModules = () => {
+    return [
+      'heapq', 'collections', 'itertools', 'math', 'random', 'string', 're', 'json',
+      'datetime', 'time', 'os', 'sys', 'pathlib', 'functools', 'operator', 'bisect',
+      'array', 'copy', 'enum', 'typing', 'dataclasses', 'abc', 'contextlib', 'io',
+      'pickle', 'sqlite3', 'csv', 'xml', 'html', 'urllib', 'http', 'socket', 'threading',
+      'multiprocessing', 'asyncio', 'logging', 'unittest', 'pdb', 'traceback', 'warnings',
+      'argparse', 'getopt', 'shutil', 'tempfile', 'glob', 'fnmatch', 'linecache', 'codecs',
+      'hashlib', 'hmac', 'secrets', 'base64', 'zlib', 'gzip', 'bz2', 'lzma', 'zipfile',
+      'tarfile', 'statistics', 'decimal', 'fractions', 'cmath', 'numbers', 'unicodedata',
+      'locale', 'gettext', 'textwrap', 'difflib', 'readline', 'rlcompleter', 'struct',
+      'codecs', 'mmap', 'select', 'selectors', 'signal', 'errno', 'ctypes', 'marshal',
+      'dbm', 'shelve', 'sqlite3', 'zlib', 'gzip', 'bz2', 'lzma', 'zipfile', 'tarfile',
+      'csv', 'configparser', 'netrc', 'xdrlib', 'plistlib', 'hashlib', 'hmac', 'secrets',
+      'base64', 'binascii', 'queue', 'weakref', 'types', 'copy', 'pprint', 'reprlib',
+      'enum', 'numbers', 'math', 'cmath', 'decimal', 'fractions', 'statistics', 'random',
+      'secrets', 'statistics', 'itertools', 'functools', 'operator', 'pathlib', 'fileinput',
+      'stat', 'filecmp', 'tempfile', 'glob', 'fnmatch', 'linecache', 'shutil', 'pickle',
+      'copyreg', 'shelve', 'marshal', 'dbm', 'sqlite3', 'zlib', 'gzip', 'bz2', 'lzma',
+      'zipfile', 'tarfile', 'csv', 'configparser', 'netrc', 'xdrlib', 'plistlib', 'hashlib',
+      'hmac', 'secrets', 'base64', 'binascii', 'queue', 'weakref', 'types', 'copy', 'pprint',
+      'reprlib', 'enum', 'numbers', 'math', 'cmath', 'decimal', 'fractions', 'statistics'
+    ]
+  }
+
+  // Get module members (functions, attributes) for Python standard library modules
+  const getPythonModuleMembers = (moduleName) => {
+    const moduleMembers = {
+      heapq: ['heappush', 'heappop', 'heapify', 'heappushpop', 'heapreplace', 'nlargest', 'nsmallest', 'merge'],
+      collections: ['deque', 'defaultdict', 'OrderedDict', 'Counter', 'ChainMap', 'namedtuple', 'UserDict', 'UserList', 'UserString'],
+      itertools: ['chain', 'combinations', 'combinations_with_replacement', 'compress', 'count', 'cycle', 'dropwhile', 'filterfalse', 'groupby', 'islice', 'permutations', 'product', 'repeat', 'starmap', 'takewhile', 'tee', 'zip_longest'],
+      math: ['ceil', 'floor', 'sqrt', 'pow', 'exp', 'log', 'log10', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2', 'degrees', 'radians', 'pi', 'e', 'tau', 'inf', 'nan', 'fabs', 'fmod', 'gcd', 'lcm', 'factorial', 'isqrt', 'copysign', 'fsum', 'prod'],
+      random: ['random', 'randint', 'randrange', 'choice', 'choices', 'shuffle', 'sample', 'uniform', 'gauss', 'expovariate', 'seed'],
+      string: ['ascii_letters', 'ascii_lowercase', 'ascii_uppercase', 'digits', 'hexdigits', 'octdigits', 'punctuation', 'whitespace', 'printable', 'capwords', 'Template'],
+      re: ['match', 'search', 'findall', 'finditer', 'sub', 'subn', 'split', 'compile', 'escape', 'fullmatch'],
+      json: ['loads', 'dumps', 'load', 'dump'],
+      datetime: ['datetime', 'date', 'time', 'timedelta', 'timezone', 'now', 'today', 'utcnow', 'strptime', 'strftime'],
+      time: ['time', 'sleep', 'gmtime', 'localtime', 'mktime', 'strftime', 'strptime', 'asctime', 'ctime'],
+      os: ['getcwd', 'chdir', 'listdir', 'mkdir', 'makedirs', 'remove', 'rmdir', 'removedirs', 'rename', 'renames', 'path', 'environ', 'getenv', 'putenv', 'system'],
+      sys: ['argv', 'exit', 'stdin', 'stdout', 'stderr', 'path', 'modules', 'version', 'platform'],
+      pathlib: ['Path', 'PurePath', 'PurePosixPath', 'PureWindowsPath', 'PosixPath', 'WindowsPath'],
+      functools: ['reduce', 'partial', 'lru_cache', 'cache', 'wraps', 'update_wrapper', 'cmp_to_key', 'total_ordering'],
+      operator: ['add', 'sub', 'mul', 'truediv', 'floordiv', 'mod', 'pow', 'lt', 'le', 'eq', 'ne', 'ge', 'gt', 'not_', 'is_', 'is_not', 'and_', 'or_', 'xor', 'itemgetter', 'attrgetter', 'methodcaller'],
+      bisect: ['bisect_left', 'bisect_right', 'bisect', 'insort_left', 'insort_right', 'insort'],
+      array: ['array'],
+      copy: ['copy', 'deepcopy'],
+      enum: ['Enum', 'IntEnum', 'Flag', 'IntFlag', 'auto'],
+      typing: ['List', 'Dict', 'Tuple', 'Set', 'Optional', 'Union', 'Any', 'Callable', 'TypeVar', 'Generic'],
+      dataclasses: ['dataclass', 'field', 'fields', 'asdict', 'astuple', 'replace'],
+      abc: ['ABC', 'abstractmethod', 'abstractproperty'],
+      contextlib: ['contextmanager', 'closing', 'suppress', 'redirect_stdout', 'redirect_stderr', 'nullcontext'],
+      io: ['open', 'StringIO', 'BytesIO'],
+      pickle: ['dump', 'dumps', 'load', 'loads'],
+      csv: ['reader', 'writer', 'DictReader', 'DictWriter'],
+      xml: ['ElementTree', 'Element', 'parse'],
+      html: ['escape', 'unescape'],
+      urllib: ['request', 'parse', 'error', 'robotparser'],
+      http: ['client', 'server', 'cookies'],
+      socket: ['socket', 'AF_INET', 'SOCK_STREAM', 'gethostname', 'gethostbyname'],
+      threading: ['Thread', 'Lock', 'RLock', 'Condition', 'Event', 'Semaphore', 'Timer'],
+      multiprocessing: ['Process', 'Queue', 'Pipe', 'Pool', 'Manager', 'Value', 'Array'],
+      asyncio: ['run', 'create_task', 'sleep', 'gather', 'wait', 'wait_for', 'as_completed', 'get_event_loop'],
+      logging: ['getLogger', 'basicConfig', 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+      unittest: ['TestCase', 'TestSuite', 'TestLoader', 'TextTestRunner', 'mock', 'assertEqual', 'assertTrue', 'assertFalse'],
+      pdb: ['set_trace', 'post_mortem', 'pm', 'run', 'runeval', 'runcall'],
+      traceback: ['print_exc', 'format_exc', 'print_stack', 'extract_tb', 'format_tb'],
+      warnings: ['warn', 'filterwarnings', 'simplefilter'],
+      argparse: ['ArgumentParser', 'Namespace'],
+      getopt: ['getopt', 'gnu_getopt'],
+      shutil: ['copy', 'copy2', 'copytree', 'move', 'rmtree', 'make_archive', 'unpack_archive'],
+      tempfile: ['TemporaryFile', 'NamedTemporaryFile', 'TemporaryDirectory', 'mkdtemp', 'mkstemp', 'gettempdir', 'gettempdirb'],
+      glob: ['glob', 'iglob', 'escape'],
+      fnmatch: ['fnmatch', 'filter', 'translate'],
+      linecache: ['getline', 'clearcache', 'checkcache'],
+      codecs: ['encode', 'decode', 'lookup', 'open'],
+      hashlib: ['md5', 'sha1', 'sha224', 'sha256', 'sha384', 'sha512', 'blake2b', 'blake2s', 'pbkdf2_hmac'],
+      hmac: ['new', 'compare_digest'],
+      secrets: ['token_bytes', 'token_hex', 'token_urlsafe', 'choice', 'randbelow', 'compare_digest'],
+      base64: ['b64encode', 'b64decode', 'urlsafe_b64encode', 'urlsafe_b64decode', 'standard_b64encode', 'standard_b64decode'],
+      zlib: ['compress', 'decompress', 'compressobj', 'decompressobj'],
+      gzip: ['open', 'compress', 'decompress'],
+      bz2: ['open', 'compress', 'decompress'],
+      lzma: ['open', 'compress', 'decompress'],
+      zipfile: ['ZipFile', 'is_zipfile'],
+      tarfile: ['open', 'is_tarfile'],
+      statistics: ['mean', 'median', 'mode', 'stdev', 'variance', 'pstdev', 'pvariance', 'quantiles'],
+      decimal: ['Decimal', 'getcontext', 'setcontext', 'localcontext'],
+      fractions: ['Fraction'],
+      cmath: ['sqrt', 'exp', 'log', 'log10', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'sinh', 'cosh', 'tanh', 'asinh', 'acosh', 'atanh', 'phase', 'polar', 'rect'],
+      numbers: ['Number', 'Complex', 'Real', 'Rational', 'Integral'],
+      unicodedata: ['name', 'lookup', 'category', 'bidirectional', 'combining', 'east_asian_width', 'mirrored', 'decomposition', 'normalize', 'decimal', 'digit', 'numeric'],
+      locale: ['setlocale', 'getlocale', 'localeconv', 'str', 'format', 'currency', 'strcoll', 'strxfrm', 'getpreferredencoding'],
+      gettext: ['translation', 'install', 'gettext', 'ngettext', 'dgettext', 'dngettext'],
+      textwrap: ['wrap', 'fill', 'dedent', 'indent', 'shorten'],
+      difflib: ['SequenceMatcher', 'Differ', 'unified_diff', 'context_diff', 'get_close_matches', 'ndiff'],
+      readline: ['read_history_file', 'write_history_file', 'set_history_length', 'get_history_length', 'set_completer', 'get_completer', 'parse_and_bind', 'set_completion_display_matches_hook'],
+      rlcompleter: ['Completer'],
+      struct: ['pack', 'unpack', 'pack_into', 'unpack_from', 'calcsize', 'Struct'],
+      mmap: ['mmap', 'ACCESS_READ', 'ACCESS_WRITE', 'ACCESS_COPY'],
+      select: ['select', 'poll', 'epoll', 'kqueue', 'kevent', 'devpoll', 'PIPE_BUF'],
+      selectors: ['DefaultSelector', 'SelectSelector', 'PollSelector', 'EpollSelector', 'KqueueSelector', 'EventSelector'],
+      signal: ['signal', 'SIGINT', 'SIGTERM', 'SIGKILL', 'alarm', 'pause', 'setitimer', 'getitimer'],
+      errno: ['errorcode', 'EACCES', 'EADDRINUSE', 'EADDRNOTAVAIL', 'EAFNOSUPPORT', 'EAGAIN', 'EALREADY', 'EBADF', 'EBADMSG', 'EBUSY', 'ECANCELED', 'ECHILD', 'ECONNABORTED', 'ECONNREFUSED', 'ECONNRESET', 'EDEADLK', 'EDESTADDRREQ', 'EDOM', 'EDQUOT', 'EEXIST', 'EFAULT', 'EFBIG', 'EHOSTUNREACH', 'EIDRM', 'EILSEQ', 'EINPROGRESS', 'EINTR', 'EINVAL', 'EIO', 'EISCONN', 'EISDIR', 'ELOOP', 'EMFILE', 'EMLINK', 'EMSGSIZE', 'ENAMETOOLONG', 'ENETDOWN', 'ENETRESET', 'ENETUNREACH', 'ENFILE', 'ENOBUFS', 'ENODEV', 'ENOENT', 'ENOEXEC', 'ENOLCK', 'ENOLINK', 'ENOMEM', 'ENOMSG', 'ENOPROTOOPT', 'ENOSPC', 'ENOSR', 'ENOSTR', 'ENOSYS', 'ENOTCONN', 'ENOTDIR', 'ENOTEMPTY', 'ENOTRECOVERABLE', 'ENOTSOCK', 'ENOTSUP', 'ENOTTY', 'ENXIO', 'EOPNOTSUPP', 'EOVERFLOW', 'EOWNERDEAD', 'EPERM', 'EPIPE', 'EPROTO', 'EPROTONOSUPPORT', 'EPROTOTYPE', 'ERANGE', 'EREMOTE', 'EROFS', 'ESPIPE', 'ESRCH', 'ESTALE', 'ETIME', 'ETIMEDOUT', 'ETXTBSY', 'EWOULDBLOCK', 'EXDEV'],
+      ctypes: ['c_int', 'c_float', 'c_double', 'c_char', 'c_char_p', 'c_void_p', 'c_bool', 'c_long', 'c_longlong', 'c_short', 'c_ushort', 'c_uint', 'c_ulong', 'c_ulonglong', 'c_size_t', 'c_ssize_t', 'Structure', 'Union', 'Array', 'Pointer', 'byref', 'cast', 'POINTER', 'CFUNCTYPE', 'cdll', 'windll', 'oledll'],
+      marshal: ['dump', 'load', 'dumps', 'loads', 'version'],
+      dbm: ['open', 'whichdb'],
+      shelve: ['open'],
+      queue: ['Queue', 'LifoQueue', 'PriorityQueue', 'Empty', 'Full'],
+      weakref: ['ref', 'proxy', 'WeakValueDictionary', 'WeakKeyDictionary', 'WeakSet', 'getweakrefcount', 'getweakrefs'],
+      types: ['FunctionType', 'MethodType', 'BuiltinFunctionType', 'LambdaType', 'CodeType', 'FrameType', 'TracebackType', 'GeneratorType', 'CoroutineType', 'AsyncGeneratorType', 'ModuleType', 'SimpleNamespace', 'new_class', 'prepare_class', 'resolve_bases', 'get_original_bases', 'DynamicClassAttribute'],
+      copy: ['copy', 'deepcopy'],
+      pprint: ['pprint', 'pformat', 'PrettyPrinter', 'isreadable', 'isrecursive', 'saferepr'],
+      reprlib: ['repr', 'Repr', 'aRepr', 'recursive_repr']
+    }
+    
+    return moduleMembers[moduleName] || []
+  }
+
+  // Get autocomplete suggestions
+  const getAutocompleteSuggestions = (prefix, language, codeText) => {
+    const suggestions = []
+    
+    // Get keywords
+    const keywords = getLanguageKeywords(language)
+    keywords.forEach(keyword => {
+      if (keyword.toLowerCase().startsWith(prefix.toLowerCase()) && keyword.toLowerCase() !== prefix.toLowerCase()) {
+        suggestions.push({ type: 'keyword', value: keyword, label: keyword })
+      }
+    })
+    
+    // Get defined symbols (variables, functions, imports)
+    const symbols = extractCodeSymbols(codeText, language)
+    
+    // Variables
+    symbols.variables.forEach(variable => {
+      if (variable.toLowerCase().startsWith(prefix.toLowerCase()) && variable.toLowerCase() !== prefix.toLowerCase()) {
+        suggestions.push({ type: 'variable', value: variable, label: variable })
+      }
+    })
+    
+    // Functions
+    symbols.functions.forEach(func => {
+      if (func.toLowerCase().startsWith(prefix.toLowerCase()) && func.toLowerCase() !== prefix.toLowerCase()) {
+        suggestions.push({ type: 'function', value: func, label: func })
+      }
+    })
+    
+    // Already imported modules
+    symbols.imports.forEach(module => {
+      if (module.toLowerCase().startsWith(prefix.toLowerCase()) && module.toLowerCase() !== prefix.toLowerCase()) {
+        suggestions.push({ type: 'module', value: module, label: module })
+      }
+    })
+    
+    // Standard library modules (Python only for now)
+    if (language === 'python') {
+      const stdlibModules = getPythonStandardModules()
+      stdlibModules.forEach(module => {
+        if (module.toLowerCase().startsWith(prefix.toLowerCase()) && 
+            module.toLowerCase() !== prefix.toLowerCase() &&
+            !symbols.imports.has(module)) {
+          suggestions.push({ type: 'module', value: module, label: module, needsImport: true })
+        }
+      })
+    }
+    
+    // Sort suggestions: keywords first, then variables, functions, modules
+    const typeOrder = { keyword: 0, variable: 1, function: 2, module: 3 }
+    suggestions.sort((a, b) => {
+      const typeDiff = typeOrder[a.type] - typeOrder[b.type]
+      if (typeDiff !== 0) return typeDiff
+      return a.value.localeCompare(b.value)
+    })
+    
+    return suggestions.slice(0, 20) // Limit to 20 suggestions
+  }
+
+  // Calculate cursor position for autocomplete dropdown
+  const calculateAutocompletePosition = (textarea, wordStart) => {
+    if (!textarea) return { top: 0, left: 0 }
+    
+    const textBeforeCursor = code.substring(0, wordStart)
+    const lines = textBeforeCursor.split('\n')
+    const currentLine = lines.length - 1
+    const column = lines[currentLine].length
+    
+    // Get textarea position relative to its container
+    const container = textarea.closest('[data-editor-container]')
+    if (!container) return { top: 0, left: 0 }
+    
+    // Calculate character position
+    const lineHeight = parseFloat(getComputedStyle(textarea).lineHeight) || 22.4
+    const charWidth = 8.4 // Approximate character width for monospace font at 14px
+    const textareaPadding = 16 // Padding of the textarea
+    
+    // Position relative to container (which should have position: relative)
+    // Position BELOW the current line to avoid obstructing typing
+    // Calculate the top position of the current line, then add lineHeight to go below it
+    const currentLineTop = currentLine * lineHeight + textareaPadding - textarea.scrollTop
+    const top = currentLineTop + lineHeight + 2 // Position below current line with small gap
+    
+    const left = column * charWidth - textarea.scrollLeft + textareaPadding // Account for padding
+    
+    // Check if dropdown would go off-screen to the right, if so, position to the left of cursor
+    const containerRect = container.getBoundingClientRect()
+    const estimatedDropdownWidth = 250 // Approximate dropdown width
+    const rightEdge = left + estimatedDropdownWidth
+    
+    let finalLeft = left
+    // If dropdown would overflow to the right, position it to the left of the cursor
+    if (rightEdge > containerRect.width - 20) {
+      // Position to the left, but ensure it doesn't go off the left edge
+      finalLeft = Math.max(10, column * charWidth - textarea.scrollLeft - estimatedDropdownWidth + textareaPadding)
+    }
+    
+    return { top, left: finalLeft }
+  }
+
+  // Check if a module needs to be imported and add import statement
+  const addImportIfNeeded = (moduleName, language, codeText) => {
+    if (language !== 'python') return codeText
+    
+    // Check if import already exists
+    const lines = codeText.split('\n')
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (trimmed.startsWith('import ') && trimmed.includes(moduleName)) {
+        return codeText // Already imported
+      }
+      if (trimmed.startsWith('from ') && trimmed.includes(moduleName)) {
+        return codeText // Already imported
+      }
+    }
+    
+    // Find the first non-import line to insert import
+    let insertIndex = 0
+    for (let i = 0; i < lines.length; i++) {
+      const trimmed = lines[i].trim()
+      if (trimmed && !trimmed.startsWith('#') && !trimmed.startsWith('import ') && !trimmed.startsWith('from ')) {
+        insertIndex = i
+        break
+      }
+      if (trimmed.startsWith('import ') || trimmed.startsWith('from ')) {
+        insertIndex = i + 1
+      }
+    }
+    
+    // Insert import statement
+    const importLine = `import ${moduleName}\n`
+    const newLines = [...lines]
+    newLines.splice(insertIndex, 0, importLine)
+    return newLines.join('\n')
+  }
+
+
+  // Close autocomplete when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (showAutocomplete) {
+        const autocompleteElement = document.querySelector('[data-autocomplete]')
+        const textarea = document.querySelector('textarea')
+        if (autocompleteElement && !autocompleteElement.contains(e.target) && 
+            textarea && !textarea.contains(e.target)) {
+          setShowAutocomplete(false)
+        }
+      }
+    }
+    
+    if (showAutocomplete) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside)
+      }
+    }
+  }, [showAutocomplete])
+
+  // Track cursor position on focus to ensure it's always tracked
+  useEffect(() => {
+    const textarea = document.querySelector('textarea')
+    if (!textarea) return
+    
+    const handleFocus = () => {
+      const start = textarea.selectionStart
+      const end = textarea.selectionEnd
+      cursorPositionRef.current = { start, end }
+      setCursorPosition({ start, end })
+    }
+    
+    textarea.addEventListener('focus', handleFocus)
+    return () => textarea.removeEventListener('focus', handleFocus)
+  }, [code]) // Re-attach when code changes (textarea might be recreated)
 
   // Handle browser back/forward navigation
   useEffect(() => {
@@ -3912,13 +4655,37 @@ export default function App() {
                       position: 'relative', 
                       flex: 1, 
                       minHeight: 0,
-                              overflow: 'auto',
+                      overflow: 'auto',
                       backgroundColor: theme.codeBackground
                     }}>
                             <textarea
                         value={code}
-                        onChange={(e) => setCode(e.target.value)}
+                        onChange={(e) => handleCodeChange(e.target.value)}
                         onKeyDown={handleKeyDown}
+                        onSelect={(e) => {
+                          // Track cursor position on selection changes
+                          const textarea = e.target
+                          const start = textarea.selectionStart
+                          const end = textarea.selectionEnd
+                          cursorPositionRef.current = { start, end }
+                          setCursorPosition({ start, end })
+                        }}
+                        onMouseUp={(e) => {
+                          // Track cursor position on mouse click
+                          const textarea = e.target
+                          const start = textarea.selectionStart
+                          const end = textarea.selectionEnd
+                          cursorPositionRef.current = { start, end }
+                          setCursorPosition({ start, end })
+                        }}
+                        onKeyUp={(e) => {
+                          // Track cursor position on arrow keys and other navigation
+                          const textarea = e.target
+                          const start = textarea.selectionStart
+                          const end = textarea.selectionEnd
+                          cursorPositionRef.current = { start, end }
+                          setCursorPosition({ start, end })
+                        }}
                               style={{
                                 width: '100%',
                           height: '100%',
@@ -3941,6 +4708,81 @@ export default function App() {
                         }}
                         placeholder="Write your code here..."
                       />
+                      {/* Autocomplete Dropdown */}
+                      {showAutocomplete && autocompleteSuggestions.length > 0 && (
+                        <div
+                          data-autocomplete
+                          style={{
+                            position: 'absolute',
+                            top: `${autocompletePosition.top}px`,
+                            left: `${autocompletePosition.left}px`,
+                            backgroundColor: theme.background,
+                            border: `1px solid ${theme.border}`,
+                            borderRadius: '6px',
+                            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                            zIndex: 1000,
+                            maxHeight: '300px',
+                            overflowY: 'auto',
+                            minWidth: '200px',
+                            maxWidth: '400px',
+                            fontFamily: '"SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Liberation Mono", "Courier New", monospace',
+                            fontSize: '13px'
+                          }}
+                          onMouseDown={(e) => e.preventDefault()} // Prevent textarea from losing focus
+                        >
+                          {autocompleteSuggestions.map((suggestion, index) => {
+                            const isSelected = index === autocompleteSelectedIndex
+                            const typeColors = {
+                              keyword: theme.primary,
+                              variable: theme.accent,
+                              function: theme.success,
+                              module: theme.warning
+                            }
+                            const typeIcons = {
+                              keyword: '🔑',
+                              variable: '📝',
+                              function: '⚙️',
+                              module: '📦'
+                            }
+                            
+                            return (
+                              <div
+                                key={index}
+                                onClick={() => applyAutocomplete(suggestion)}
+                                onMouseEnter={() => setAutocompleteSelectedIndex(index)}
+                                style={{
+                                  padding: '8px 12px',
+                                  cursor: 'pointer',
+                                  backgroundColor: isSelected ? theme.primary + '20' : 'transparent',
+                                  borderBottom: index < autocompleteSuggestions.length - 1 ? `1px solid ${theme.border}` : 'none',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  transition: 'background-color 0.1s ease'
+                                }}
+                              >
+                                <span style={{ fontSize: '14px' }}>{typeIcons[suggestion.type] || '•'}</span>
+                                <span style={{ 
+                                  color: isSelected ? theme.primary : theme.text,
+                                  fontWeight: isSelected ? '600' : '400'
+                                }}>
+                                  {suggestion.label}
+                                </span>
+                                {suggestion.needsImport && (
+                                  <span style={{
+                                    marginLeft: 'auto',
+                                    fontSize: '11px',
+                                    color: theme.textSecondary,
+                                    fontStyle: 'italic'
+                                  }}>
+                                    import
+                                  </span>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
                         </div>
 
                     {/* Console Output Section */}
