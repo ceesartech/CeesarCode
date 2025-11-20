@@ -60,16 +60,23 @@
 
 ### **Core Interface**
 - **Dark/Light Mode Toggle** — Switch between themes with one click
-- **Problem Sidebar** — Clean list of available coding problems (collapsible, resizable)
-- **Code Editor** — Full-featured editor with:
+- **Problem Sidebar** — Clean list of available coding problems (collapsible, resizable) with sticky header
+- **Code Editor** — Professional Monaco Editor (VS Code editor) with:
+  - **Monaco Editor Integration** — Industry-standard editor used by VS Code, Coderpad, CodeSignal, HackerRank
+  - **Advanced Syntax Highlighting** — Full IntelliSense and language support
+  - **Built-in Autocomplete** — Intelligent code completion and suggestions
   - **Line Numbers** — Numbered lines for easy code navigation
-  - **Synchronized Scrolling** — Line numbers scroll with code
-  - **Syntax Highlighting** — Modern monospace font support
+  - **Code Navigation** — Go to line, find/replace, bracket matching
+  - **Keyboard Shortcuts** — VS Code-style shortcuts (Ctrl+Enter to run, Ctrl+L to clear)
   - **Resizable Layout** — Adjustable problem statement and code editor panes
+  - **Full Window Utilization** — Maximized browser width and height
 - **Language Selection** — 14 programming languages supported
 - **Browser Navigation** — Back, Forward, and Refresh buttons for seamless navigation
-- **Real-time Execution** — Run code and see immediate results with console output
-- **Console Output** — Terminal-like output display (collapsible, resizable)
+- **Real-time Execution** — Run code and see immediate results with terminal output
+- **Terminal Output** — Professional xterm.js terminal emulator (collapsible, resizable) with:
+  - **xterm.js Integration** — Full terminal emulator experience
+  - **ANSI Color Support** — Proper error formatting with colors
+  - **Auto-resize** — Automatically fits container size
 
 ### **Code Execution**
 - **Run Code** — Test your code against a single test case for quick validation

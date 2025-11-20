@@ -2,6 +2,69 @@
 
 ## Recent Updates
 
+### Version 1.5.0 - Professional Editor & Terminal Integration
+
+#### ✨ New Features
+
+1. **Monaco Editor Integration**
+   - Replaced custom textarea with Monaco Editor (VS Code editor)
+   - Industry-standard editor used by Coderpad, CodeSignal, HackerRank
+   - Full IntelliSense and autocomplete support
+   - Advanced syntax highlighting for all languages
+   - Professional code navigation features
+   - VS Code-style keyboard shortcuts
+
+2. **xterm.js Terminal Integration**
+   - Replaced console div with xterm.js terminal emulator
+   - Professional terminal experience
+   - ANSI color support for error formatting
+   - Auto-resize functionality
+   - Authentic terminal output display
+
+3. **Optimized Layout**
+   - Full browser width and height utilization
+   - Independent pane scrolling (main page is static)
+   - Compressed headers for maximum content space
+   - Extended editor and questions pane to bottom of browser
+
+4. **Sticky Problems Pane Header**
+   - "Problems" header stays visible while scrolling
+   - "Clear All" and "Clean AI" buttons always accessible
+   - Improved navigation and usability
+
+#### 🔧 Improvements
+
+1. **Editor Experience**
+   - Removed custom autocomplete (Monaco handles this)
+   - Simplified code change handlers
+   - Better keyboard shortcut integration
+   - Professional editor features
+
+2. **Layout & Scrolling**
+   - Fixed main page to be static
+   - Each pane scrolls independently
+   - Better space utilization
+   - Compressed header spaces
+
+3. **UI Polish**
+   - Sidebar toggle button positioned within Problem Statement header
+   - Better button sizing and positioning
+   - Improved visual hierarchy
+
+#### 🐛 Bug Fixes
+
+1. **Editor Issues**
+   - Fixed duplicate key warning in Python autocomplete data
+   - Improved editor initialization
+   - Better error handling
+
+2. **Layout Issues**
+   - Fixed scrolling behavior
+   - Fixed pane height calculations
+   - Improved responsive behavior
+
+---
+
 ### Version 1.4.0 - System Design Questions & Enhanced Features
 
 #### ✨ New Features

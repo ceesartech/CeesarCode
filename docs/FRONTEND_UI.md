@@ -93,14 +93,17 @@ App
 - **Collapsible**: Toggle visibility
 - **Resizable**: Drag to adjust width
 - **Problem List**: Scrollable list of all problems
+- **Sticky Header**: "Problems" header with "Clear All" and "Clean AI" buttons stays visible while scrolling
 - **Search/Filter**: (Future enhancement)
 - **Create Button**: Quick access to problem creation
 
 #### Main Content Area
-- **Problem Statement**: Left panel with problem description
-- **Code Editor**: Center panel with syntax highlighting
-- **Console/Results**: Bottom panel with execution output
+- **Problem Statement**: Left panel with problem description (independently scrollable)
+- **Code Editor**: Center panel with Monaco Editor (VS Code editor)
+- **Terminal Output**: Bottom panel with xterm.js terminal emulator (independently scrollable)
 - **Resizable Panels**: Drag borders to adjust sizes
+- **Full Window Utilization**: Maximized browser width and height
+- **Independent Scrolling**: Each pane scrolls independently, main page is static
 
 #### Header
 - **Logo**: CeesarCode logo with gradient design
@@ -130,9 +133,14 @@ App
 
 ### Responsive Design
 
-- **Desktop**: Full three-panel layout
+- **Desktop**: Full three-panel layout with independent scrolling
 - **Tablet**: Collapsible sidebar
 - **Mobile**: Stacked layout (future enhancement)
+- **Layout Optimization**: 
+  - Main page is static (no page scrolling)
+  - Individual panes handle their own scrolling
+  - Full browser width and height utilization
+  - Compressed headers for maximum content space
 
 ---
 
@@ -181,43 +189,65 @@ useEffect(() => {
 
 ## Code Editor
 
+### Monaco Editor Integration
+
+The code editor uses **Monaco Editor**, the same editor that powers Visual Studio Code, Coderpad, CodeSignal, and HackerRank. This provides a professional, industry-standard coding experience.
+
 ### Features
 
-- **Syntax Highlighting**: Language-specific colors
+- **Monaco Editor**: Full VS Code editor experience
+- **Advanced Syntax Highlighting**: Language-specific colors and IntelliSense
+- **Built-in Autocomplete**: Intelligent code completion and suggestions
 - **Line Numbers**: Numbered lines with synchronized scrolling
-- **Monospace Font**: Consistent character width
-- **Resizable**: Adjustable height
-- **Tab Support**: Proper indentation
+- **Code Navigation**: Go to line, find/replace, bracket matching
+- **Keyboard Shortcuts**: Full VS Code-style shortcuts
+  - `Ctrl/Cmd + Enter`: Run code
+  - `Ctrl/Cmd + L`: Clear code
+  - `Ctrl/Cmd + /`: Toggle comment
+  - `Ctrl/Cmd + D`: Duplicate line
+  - `Ctrl/Cmd + Shift + F`: Format code
+- **Resizable**: Adjustable height and width
+- **Tab Support**: Proper indentation with configurable tab size
 - **Copy/Paste**: Standard clipboard operations
+- **Full Width/Height**: Maximized browser space utilization
 
 ### Editor Implementation
 
 ```javascript
-<textarea
+import Editor from '@monaco-editor/react'
+
+<Editor
+  height="100%"
+  language={getMonacoLanguage(selectedLanguage)}
   value={code}
-  onChange={(e) => setCode(e.target.value)}
-  style={{
-    fontFamily: 'monospace',
-    fontSize: '14px',
-    // ... styling
+  onChange={(value) => handleCodeChange(value || '')}
+  theme={isDarkMode ? 'vs-dark' : 'light'}
+  options={{
+    minimap: { enabled: false },
+    fontSize: 14,
+    lineNumbers: 'on',
+    automaticLayout: true,
+    tabSize: 2,
+    wordWrap: 'on',
+    // ... more options
   }}
 />
 ```
 
-### Line Numbers
-
-```javascript
-// Line number display
-<div className="line-numbers">
-  {code.split('\n').map((_, i) => (
-    <div key={i}>{i + 1}</div>
-  ))}
-</div>
-```
-
 ### Language Support
 
-All 14+ languages supported with appropriate syntax highlighting hints.
+All 14+ languages supported with full Monaco Editor language support:
+- Python, JavaScript, TypeScript, Java, C++, C, Go, Rust, Swift, Kotlin, Scala, Ruby, Bash, Shell, SQL
+
+### Terminal Output
+
+The console output uses **xterm.js**, a professional terminal emulator:
+
+- **xterm.js Integration**: Full terminal emulator experience
+- **ANSI Color Support**: Proper error formatting with colors
+- **Terminal Features**: Cursor, scrolling, selection
+- **Auto-resize**: Automatically fits container size
+- **Theme Support**: Adapts to dark/light mode
 
 ---
 

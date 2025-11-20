@@ -43,6 +43,8 @@ Visit `http://localhost:5173` (dev) or `http://localhost:8080` (prod)
 
 ## ✨ Key Features
 
+- **💻 Professional Code Editor** - Monaco Editor (VS Code editor) with IntelliSense, autocomplete, and advanced syntax highlighting
+- **🖥️ Terminal Output** - xterm.js terminal emulator with ANSI color support and professional terminal experience
 - **🤖 AI Question Generator** - Generate unique interview questions with web research
 - **🌐 Comprehensive Web Search** - 12 concurrent searches for detailed position information
 - **💻 Multi-Language Support** - 14+ programming languages
@@ -52,6 +54,7 @@ Visit `http://localhost:5173` (dev) or `http://localhost:8080` (prod)
 - **📁 File Upload System** - Upload datasets for ML/Data Science
 - **📓 Jupyter Mode** - Interactive cell-based coding
 - **🌙 Dark Mode** - Beautiful dark/light theme support
+- **📐 Optimized Layout** - Full browser window utilization with independent pane scrolling
 
 ## 🏗️ Architecture
 
@@ -74,11 +77,13 @@ All comprehensive documentation is in the [`docs/`](./docs/) directory:
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: React 18, Vite
+- **Frontend**: React 18, Vite, Monaco Editor (VS Code editor), xterm.js (terminal emulator)
 - **Backend**: Go 1.22+
 - **Executor**: Rust
 - **AI Providers**: Google Gemini, OpenAI GPT, Anthropic Claude
 - **Languages**: Python, C++, Java, JavaScript, TypeScript, Go, Rust, and more
+- **Editor**: Monaco Editor (same as VS Code, Coderpad, CodeSignal, HackerRank)
+- **Terminal**: xterm.js (professional terminal emulator)
 
 ## 📦 Installation
 

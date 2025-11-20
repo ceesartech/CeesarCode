@@ -227,7 +227,13 @@ This document provides a comprehensive overview of all features in CeesarCode, i
 
 ## 🎨 UI Features
 
-### Code Editor
+### Code Editor (Monaco Editor)
+
+**Professional Editor**:
+- **Monaco Editor Integration**: Industry-standard VS Code editor
+- Used by Coderpad, CodeSignal, HackerRank, and VS Code
+- Full IntelliSense and language support
+- Built-in autocomplete and code suggestions
 
 **Line Numbers**:
 - Displayed on the left side
@@ -238,40 +244,62 @@ This document provides a comprehensive overview of all features in CeesarCode, i
 **Layout**:
 - Side-by-side with problem statement
 - Resizable width (25%-75%)
-- Full height with console below
-- Scrollable to end of last line
+- Full height with terminal below
+- Extends to bottom of browser window
+- Full browser width utilization
 
 **Features**:
-- Syntax highlighting support
-- Tab completion
-- Keyboard shortcuts (Ctrl+Enter to run)
+- Advanced syntax highlighting
+- IntelliSense autocomplete
+- Code navigation (go to line, find/replace)
+- Keyboard shortcuts (Ctrl+Enter to run, Ctrl+L to clear)
 - Language-specific file naming
+- Professional editor experience
 
 ### Problem Statement Panel
 
 **Features**:
 - Resizable width (25%-75%)
-- Scrollable content
+- Independently scrollable content
 - Markdown support
 - Code examples display
+- Extends to bottom of browser window
 
-### Console Output Panel
+### Terminal Output Panel (xterm.js)
+
+**Professional Terminal**:
+- **xterm.js Integration**: Full terminal emulator
+- ANSI color support for error formatting
+- Terminal-style output display
+- Auto-resize to fit container
 
 **Features**:
 - Collapsible (40px when collapsed)
 - Resizable height (100px-600px)
 - Clear button
 - Running indicator
-- Terminal-like output display
+- Authentic terminal experience
+- Proper error formatting with colors
 
 ### Sidebar
 
 **Features**:
 - Collapsible
 - Resizable width (200px-600px)
-- Problem list with search
+- **Sticky Header**: "Problems" header with action buttons stays visible while scrolling
+- Problem list with independent scrolling
 - Create problem button
 - AI question generator button
+- "Clear All" and "Clean AI" buttons always accessible
+
+### Layout Optimization
+
+**Full Window Utilization**:
+- Main page is static (no page scrolling)
+- Individual panes scroll independently
+- Full browser width and height used
+- Compressed headers for maximum content space
+- Professional layout matching industry standards
 
 ---
 
