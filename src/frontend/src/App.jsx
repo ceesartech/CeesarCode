@@ -792,10 +792,7 @@ function AppContent() {
   ]
 
   const theme = isDarkMode ? styles.dark : styles.light
-  const collapsedButtonTop = Math.max(
-    56,
-    problemHeaderMetrics.top + (problemHeaderMetrics.height - 28) / 2
-  )
+  const collapsedButtonTop = problemHeaderMetrics.top + (problemHeaderMetrics.height - 24) / 2
 
   // Keyboard shortcut functions
   const toggleComment = () => {
@@ -5126,33 +5123,6 @@ function AppContent() {
             />
           </>
         )}
-        {sidebarCollapsed && (
-          <button
-            onClick={toggleSidebar}
-            style={{
-              position: 'absolute',
-              left: 0,
-              top: `${collapsedButtonTop}px`,
-              backgroundColor: theme.primary,
-              color: '#FFFFFF',
-              border: 'none',
-              borderTopRightRadius: '6px',
-              borderBottomRightRadius: '6px',
-              padding: '6px 6px',
-              cursor: 'pointer',
-              zIndex: 10,
-              boxShadow: '2px 0 8px rgba(0,0,0,0.15)',
-              transition: 'all 0.2s ease',
-              fontSize: '12px',
-              lineHeight: 1.2,
-              minHeight: '28px'
-            }}
-            onMouseEnter={(e) => e.target.style.opacity = '0.9'}
-            onMouseLeave={(e) => e.target.style.opacity = '1'}
-          >
-            ▶
-          </button>
-        )}
 
         <main style={{
           padding: '0',
@@ -5270,18 +5240,50 @@ function AppContent() {
                   ref={problemHeaderRef}
                   style={{
                     padding: '8px 16px',
+                    paddingLeft: sidebarCollapsed ? '32px' : '16px',
                     borderBottom: `1px solid ${theme.border}`,
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                    flexShrink: 0
+                    flexShrink: 0,
+                    position: 'relative'
                 }}>
+                  {sidebarCollapsed && (
+                    <button
+                      onClick={toggleSidebar}
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        backgroundColor: theme.primary,
+                        color: '#FFFFFF',
+                        border: 'none',
+                        borderTopRightRadius: '6px',
+                        borderBottomRightRadius: '6px',
+                        padding: '4px 6px',
+                        cursor: 'pointer',
+                        zIndex: 10,
+                        boxShadow: '2px 0 8px rgba(0,0,0,0.15)',
+                        transition: 'all 0.2s ease',
+                        fontSize: '11px',
+                        lineHeight: 1,
+                        height: '24px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                      onMouseEnter={(e) => e.target.style.opacity = '0.9'}
+                      onMouseLeave={(e) => e.target.style.opacity = '1'}
+                    >
+                      ▶
+                    </button>
+                  )}
                   <h4 style={{
                     margin: 0,
                     color: theme.text,
                       fontSize: '13px',
-                    fontWeight: '600',
-                    paddingLeft: '20px'
+                    fontWeight: '600'
                   }}>
                     Problem Statement
                   </h4>
