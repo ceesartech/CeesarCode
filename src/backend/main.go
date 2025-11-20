@@ -1350,29 +1350,21 @@ func searchWebForPosition(company, role, level string) string {
 		return ""
 	}
 
-	log.Printf("Starting comprehensive web search for %s %s position at %s...", level, role, company)
+	log.Printf("Starting optimized web search for %s %s position at %s...", level, role, company)
 
-	// Define multiple search queries to gather comprehensive information
+	// Define focused search queries - reduced from 12 to 6 for faster results
 	searchQueries := []string{
-		// Interview questions and patterns
+		// Most important: Interview questions and patterns
 		fmt.Sprintf("%s %s %s coding interview questions", company, level, role),
 		fmt.Sprintf("%s %s %s technical interview questions", company, level, role),
-		fmt.Sprintf("%s %s interview process coding challenges", company, role),
 		
 		// Technical requirements and skills
 		fmt.Sprintf("%s %s %s job requirements skills technologies", company, level, role),
 		fmt.Sprintf("%s %s technical stack programming languages", company, role),
-		fmt.Sprintf("%s %s %s required skills qualifications", company, level, role),
 		
 		// Company-specific interview information
 		fmt.Sprintf("%s interview experience %s %s", company, level, role),
-		fmt.Sprintf("%s interview tips %s position", company, role),
-		fmt.Sprintf("%s coding interview preparation %s", company, role),
-		
-		// Role-specific technical details
 		fmt.Sprintf("%s %s technologies frameworks tools", company, role),
-		fmt.Sprintf("%s %s %s system design interview", company, level, role),
-		fmt.Sprintf("%s %s algorithm data structure questions", company, role),
 	}
 
 	// Perform searches concurrently with a channel to collect results
@@ -1391,7 +1383,7 @@ func searchWebForPosition(company, role, level string) string {
 	}
 
 	// Collect results with timeout - don't wait for all, just collect what we get quickly
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	var allResults []string
@@ -1405,8 +1397,8 @@ func searchWebForPosition(company, role, level string) string {
 				allResults = append(allResults, result.info)
 				log.Printf("Search completed for query: %s (found %d chars)", result.query, len(result.info))
 			}
-			// If we have enough results, don't wait for all
-			if len(allResults) >= 6 && completed >= 8 {
+			// If we have enough results, don't wait for all (with 6 queries, exit after 4 good results)
+			if len(allResults) >= 3 && completed >= 4 {
 				log.Printf("Sufficient search results collected (%d results), proceeding without waiting for all", len(allResults))
 				// Cancel remaining searches by closing context (they'll timeout individually)
 				cancel()
@@ -1434,7 +1426,7 @@ func searchWebForPosition(company, role, level string) string {
 // performSingleSearch performs a single web search and extracts information
 func performSingleSearch(searchQuery, company, role, level string) string {
 	// Use DuckDuckGo HTML API (no API key required)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
 	defer cancel()
 
 	// URL encode the search query
@@ -1451,7 +1443,7 @@ func performSingleSearch(searchQuery, company, role, level string) string {
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
 
 	// Make request
-	client := &http.Client{Timeout: 5 * time.Second}
+	client := &http.Client{Timeout: 4 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return ""
@@ -1991,7 +1983,9 @@ func formatLanguageStubs(languages []string, stubs map[string]string) string {
 }
 
 func generateAIGuestions(req AgentRequest, apiKey string) ([]Problem, error) {
-	ctx := context.Background()
+	// Create context with timeout - allow up to 15 minutes for large question counts
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	defer cancel()
 	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Gemini client: %v", err)
@@ -2438,7 +2432,8 @@ IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no 
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
 
-	client := &http.Client{Timeout: 60 * time.Second}
+	// Increased timeout for AI generation - allow up to 15 minutes for large question counts
+	client := &http.Client{Timeout: 15 * time.Minute}
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %v", err)
@@ -2612,7 +2607,8 @@ IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no 
 	httpReq.Header.Set("x-api-key", apiKey)
 	httpReq.Header.Set("anthropic-version", "2023-06-01")
 
-	client := &http.Client{Timeout: 60 * time.Second}
+	// Increased timeout for AI generation - allow up to 15 minutes for large question counts
+	client := &http.Client{Timeout: 15 * time.Minute}
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %v", err)

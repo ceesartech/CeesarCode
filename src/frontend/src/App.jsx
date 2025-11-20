@@ -1,5 +1,9 @@
-import React, { useEffect, useState, useRef, lazy, Suspense } from 'react'
+import React, { useEffect, useState, useRef, lazy, Suspense, useLayoutEffect } from 'react'
 import '@excalidraw/excalidraw/index.css'
+import Editor from '@monaco-editor/react'
+import { Terminal } from '@xterm/xterm'
+import { FitAddon } from '@xterm/addon-fit'
+import '@xterm/xterm/css/xterm.css'
 
 // Lazy load Excalidraw to prevent blocking main thread
 const Excalidraw = lazy(() => 
@@ -256,32 +260,105 @@ const styles = {
   }
 }
 
-const Editor = ({ value, onChange, theme, disabled }) => (
-  <textarea
-    value={value}
-    onChange={e => onChange(e.target.value)}
-    disabled={disabled}
+// Terminal component using xterm.js
+const TerminalComponent = ({ output, theme, isDarkMode }) => {
+  const terminalRef = useRef(null)
+  const terminalInstanceRef = useRef(null)
+  const fitAddonRef = useRef(null)
+
+  useEffect(() => {
+    if (!terminalRef.current) return
+
+    // Initialize terminal
+    const terminal = new Terminal({
+      theme: {
+        background: isDarkMode ? '#1E1E1E' : '#0D1117',
+        foreground: isDarkMode ? '#D4D4D4' : '#C9D1D9',
+        cursor: isDarkMode ? '#D4D4D4' : '#C9D1D9',
+        selection: isDarkMode ? '#264F78' : '#264F78',
+        black: '#000000',
+        red: '#CD3131',
+        green: '#0DBC79',
+        yellow: '#E5E510',
+        blue: '#2472C8',
+        magenta: '#BC3FBC',
+        cyan: '#11A8CD',
+        white: '#E5E5E5',
+        brightBlack: '#666666',
+        brightRed: '#F14C4C',
+        brightGreen: '#23D18B',
+        brightYellow: '#F5F543',
+        brightBlue: '#3B8EEA',
+        brightMagenta: '#D670D6',
+        brightCyan: '#29B8DB',
+        brightWhite: '#E5E5E5'
+      },
+      fontSize: 13,
+      fontFamily: '"SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, monospace',
+      lineHeight: 1.5,
+      cursorBlink: true,
+      cursorStyle: 'block',
+      scrollback: 1000,
+      padding: 12
+    })
+
+    const fitAddon = new FitAddon()
+    terminal.loadAddon(fitAddon)
+    terminal.open(terminalRef.current)
+    fitAddon.fit()
+
+    terminalInstanceRef.current = terminal
+    fitAddonRef.current = fitAddon
+
+    // Handle window resize
+    const handleResize = () => {
+      if (fitAddonRef.current) {
+        fitAddonRef.current.fit()
+      }
+    }
+    window.addEventListener('resize', handleResize)
+
+    return () => {
+      window.removeEventListener('resize', handleResize)
+      terminal.dispose()
+    }
+  }, [isDarkMode])
+
+  // Update terminal output when output changes
+  useEffect(() => {
+    if (!terminalInstanceRef.current) return
+
+    // Clear terminal and write new output
+    terminalInstanceRef.current.clear()
+    if (output) {
+      // Ensure output ends with proper line break
+      const formattedOutput = output.endsWith('\n') || output.endsWith('\r\n') ? output : output + '\r\n'
+      terminalInstanceRef.current.write(formattedOutput)
+    } else {
+      terminalInstanceRef.current.write('Run your code to see output here...\r\n')
+    }
+  }, [output])
+
+  // Fit terminal when container size changes
+  useEffect(() => {
+    if (fitAddonRef.current) {
+      setTimeout(() => {
+        fitAddonRef.current.fit()
+      }, 100)
+    }
+  }, [output])
+
+  return (
+    <div
+      ref={terminalRef}
     style={{
       width: '100%',
-      height: '400px',
-      fontFamily: '"SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Liberation Mono", "Courier New", monospace',
-      fontSize: '14px',
-      lineHeight: '1.6',
-      padding: '16px',
-      border: `1px solid ${theme.border}`,
-      borderRadius: '8px',
-      backgroundColor: theme.background,
-      color: theme.text,
-      resize: 'vertical',
-      outline: 'none',
-      boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.06)',
-      transition: 'border-color 0.2s ease'
-    }}
-    placeholder="Write your code here..."
-    onFocus={(e) => e.target.style.borderColor = theme.primary}
-    onBlur={(e) => e.target.style.borderColor = theme.border}
-  />
-)
+        height: '100%',
+        boxSizing: 'border-box'
+      }}
+    />
+  )
+}
 
 const LoadingSpinner = ({ theme }) => (
   <div style={{
@@ -450,6 +527,28 @@ const getFileNameForLanguage = (language) => {
   return LANGUAGE_CONFIG[language]?.fileName || 'code.txt'
 }
 
+// Map language names to Monaco Editor language IDs
+const getMonacoLanguage = (language) => {
+  const languageMap = {
+    python: 'python',
+    cpp: 'cpp',
+    c: 'c',
+    java: 'java',
+    kotlin: 'kotlin',
+    scala: 'scala',
+    go: 'go',
+    rust: 'rust',
+    swift: 'swift',
+    ruby: 'ruby',
+    javascript: 'javascript',
+    typescript: 'typescript',
+    bash: 'shell',
+    sh: 'shell',
+    sql: 'sql'
+  }
+  return languageMap[language] || 'plaintext'
+}
+
 // Get default stub code for a language when problem doesn't provide one
 const getDefaultStubForLanguage = (language) => {
   const stubs = {
@@ -616,6 +715,29 @@ function AppContent() {
     const saved = localStorage.getItem('ceesarcode-left-pane-width')
     return saved ? parseFloat(saved) : 45
   })
+  const problemHeaderRef = useRef(null)
+  const [problemHeaderMetrics, setProblemHeaderMetrics] = useState({ top: 56, height: 32 })
+  useLayoutEffect(() => {
+    if (sidebarCollapsed) return
+
+    const updateHeaderMetrics = () => {
+      if (!problemHeaderRef.current) return
+      const rect = problemHeaderRef.current.getBoundingClientRect()
+      setProblemHeaderMetrics({
+        top: rect.top,
+        height: rect.height || 32
+      })
+    }
+
+    updateHeaderMetrics()
+    window.addEventListener('resize', updateHeaderMetrics)
+    window.addEventListener('scroll', updateHeaderMetrics, true)
+
+    return () => {
+      window.removeEventListener('resize', updateHeaderMetrics)
+      window.removeEventListener('scroll', updateHeaderMetrics, true)
+    }
+  }, [sidebarCollapsed, leftPaneWidth, selectedProblem])
   const [consoleHeight, setConsoleHeight] = useState(() => {
     const saved = localStorage.getItem('ceesarcode-console-height')
     return saved ? parseInt(saved) : 200
@@ -670,6 +792,10 @@ function AppContent() {
   ]
 
   const theme = isDarkMode ? styles.dark : styles.light
+  const collapsedButtonTop = Math.max(
+    56,
+    problemHeaderMetrics.top + (problemHeaderMetrics.height - 28) / 2
+  )
 
   // Keyboard shortcut functions
   const toggleComment = () => {
@@ -1047,11 +1173,12 @@ function AppContent() {
 
     // Ensure count is valid
     const count = agentRequest.count && !isNaN(parseInt(agentRequest.count)) ? parseInt(agentRequest.count) : 3
+    const questionCount = Math.max(1, Math.min(10, count))
     const requestData = {
       company: agentRequest.company,
       role: role, // Use the selected or custom role
       level: agentRequest.level,
-      count: Math.max(1, Math.min(10, count)),
+      count: questionCount,
       jobDescription: agentRequest.jobDescription || '',
       companyDescription: agentRequest.companyDescription || '',
       interviewType: agentRequest.interviewType || '',
@@ -1067,10 +1194,17 @@ function AppContent() {
     setAgentResult(null)
     setError(null)
 
+    // Calculate adaptive timeout based on question count
+    // Base timeout: 90 seconds, plus 45 seconds per question, max 15 minutes
+    // For 10 questions: 90 + (10 * 45) = 540 seconds = 9 minutes
+    const timeoutMs = Math.min(900000, 90000 + (questionCount * 45000))
+    const timeoutMinutes = Math.round(timeoutMs / 60000 * 10) / 10
+    console.log(`Setting timeout to ${timeoutMinutes} minutes for ${questionCount} question(s)`)
+
     try {
       // Create AbortController for timeout
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 120000) // 2 minute timeout
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
       const response = await fetch('/api/agent/generate', {
         method: 'POST',
@@ -1112,8 +1246,9 @@ function AppContent() {
     } catch (err) {
       console.error('Error generating questions:', err)
       if (err.name === 'AbortError') {
-        setError('Request timed out. The AI generation is taking longer than expected. Please try again or check your internet connection.')
-        alert('Request timed out after 2 minutes. Please try again or check your internet connection.')
+        const timeoutMinutes = Math.round(timeoutMs / 60000 * 10) / 10
+        setError(`Request timed out after ${timeoutMinutes} minutes. The AI generation is taking longer than expected. Try generating fewer questions at once or check your internet connection.`)
+        alert(`Request timed out after ${timeoutMinutes} minutes. Try generating fewer questions at once (e.g., 3-5 questions) or check your internet connection.`)
       } else {
         setError(err.message)
         alert('Failed to generate questions: ' + err.message)
@@ -1458,43 +1593,17 @@ function AppContent() {
   }
 
   const handleKeyDown = (e) => {
-    // Handle autocomplete navigation
-    if (showAutocomplete && autocompleteSuggestions.length > 0) {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault()
-        setAutocompleteSelectedIndex(prev => 
-          prev < autocompleteSuggestions.length - 1 ? prev + 1 : prev
-        )
-        return
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault()
-        setAutocompleteSelectedIndex(prev => prev > 0 ? prev - 1 : 0)
-        return
-      }
-      if (e.key === 'Enter' || e.key === 'Tab') {
-        e.preventDefault()
-        const selected = autocompleteSuggestions[autocompleteSelectedIndex]
-        if (selected) {
-          applyAutocomplete(selected)
-        }
-        return
-      }
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        setShowAutocomplete(false)
-        return
-      }
-    }
+    // This function is now mainly for Jupyter cells (textarea)
+    // Monaco Editor handles its own keyboard shortcuts
     
-    // Handle Tab key for indentation (only if autocomplete is not showing)
-    if (e.key === 'Tab' && !showAutocomplete) {
+    // Handle Tab key for indentation
+    if (e.key === 'Tab') {
       handleTabKey(e)
       return
     }
     
-    // Handle Enter key for auto-indentation (only if autocomplete is not showing)
-    if (e.key === 'Enter' && !showAutocomplete) {
+    // Handle Enter key for auto-indentation
+    if (e.key === 'Enter') {
       handleEnterKey(e)
       return
     }
@@ -1549,8 +1658,8 @@ function AppContent() {
       return
     }
     
-    // Handle Escape to go back to problems list (only if autocomplete is not showing)
-    if (e.key === 'Escape' && selectedProblem && !showAutocomplete) {
+    // Handle Escape to go back to problems list
+    if (e.key === 'Escape' && selectedProblem) {
       setSelectedProblem(null)
       return
     }
@@ -1625,160 +1734,9 @@ function AppContent() {
     }
   }
 
-  // Handle code input changes and trigger autocomplete
+  // Handle code input changes
   const handleCodeChange = (newCode) => {
-    // Get and track cursor position before state update
-    const textarea = document.querySelector('textarea')
-    if (textarea) {
-      const start = textarea.selectionStart
-      const end = textarea.selectionEnd
-      cursorPositionRef.current = { start, end }
-      setCursorPosition({ start, end })
-      // Scroll to keep cursor visible while typing
-      scrollToCursor(textarea, start)
-    }
-    
-    setCode(newCode)
-    
-    // Use setTimeout to ensure DOM is updated and we can get cursor position
-    setTimeout(() => {
-      // Get cursor position
-      const textarea = document.querySelector('textarea')
-      if (!textarea) {
-        setShowAutocomplete(false)
-        return
-      }
-      
-      // Track current cursor position (browser maintains it during typing)
-      const currentStart = textarea.selectionStart
-      const currentEnd = textarea.selectionEnd
-      cursorPositionRef.current = { start: currentStart, end: currentEnd }
-      setCursorPosition({ start: currentStart, end: currentEnd })
-      
-      const cursorPos = currentStart
-      
-      // Find the current word being typed
-      const textBeforeCursor = newCode.substring(0, cursorPos)
-      const textAfterCursor = newCode.substring(cursorPos)
-      
-      // Match word characters and dots (for module.function patterns)
-      const wordMatch = textBeforeCursor.match(/[\w.]+$/)
-      if (!wordMatch) {
-        setShowAutocomplete(false)
-        return
-      }
-      
-      const currentWord = wordMatch[0]
-      const wordStart = cursorPos - currentWord.length
-      
-      // Check for module.function pattern (e.g., heapq.push or heapq.)
-      // This needs to be checked BEFORE the "still typing" check so we can show suggestions after the dot
-      const moduleFunctionMatch = currentWord.match(/^(\w+)\.(\w*)$/)
-      if (moduleFunctionMatch) {
-        const moduleName = moduleFunctionMatch[1]
-        const functionPrefix = moduleFunctionMatch[2] || ''
-        
-        // Check if module is imported or is a standard library module
-        const symbols = extractCodeSymbols(newCode, selectedLanguage)
-        const isImported = symbols.imports.has(moduleName)
-        const isStandardLib = selectedLanguage === 'python' && getPythonStandardModules().includes(moduleName)
-        
-        if (!isImported && !isStandardLib && selectedLanguage === 'python') {
-          // Module not imported and not standard library, suggest importing it
-          const suggestions = [{
-            type: 'module',
-            value: moduleName,
-            label: `${moduleName} (import)`,
-            needsImport: true
-          }]
-          setAutocompleteSuggestions(suggestions)
-          setAutocompletePrefix(moduleName)
-          setAutocompleteWordStart(wordStart)
-          setAutocompleteWordEnd(cursorPos)
-          setAutocompleteSelectedIndex(0)
-          setShowAutocomplete(true)
-          
-          // Scroll to keep cursor visible
-          scrollToCursor(textarea, cursorPos)
-          
-          // Calculate position (recalculate after scroll)
-          setTimeout(() => {
-            const position = calculateAutocompletePosition(textarea, wordStart)
-            setAutocompletePosition(position)
-          }, 0)
-          return
-        }
-        
-        // Module is imported or is standard library - show function suggestions
-        if ((isImported || isStandardLib) && selectedLanguage === 'python') {
-          const moduleMembers = getPythonModuleMembers(moduleName)
-          const suggestions = moduleMembers
-            .filter(member => member.toLowerCase().startsWith(functionPrefix.toLowerCase()))
-            .map(member => ({
-              type: 'function',
-              value: member,
-              label: member,
-              module: moduleName
-            }))
-          
-          if (suggestions.length > 0) {
-            setAutocompleteSuggestions(suggestions)
-            setAutocompletePrefix(functionPrefix || moduleName + '.')
-            setAutocompleteWordStart(wordStart + moduleName.length + 1) // Start after the dot
-            setAutocompleteWordEnd(cursorPos)
-            setAutocompleteSelectedIndex(0)
-            setShowAutocomplete(true)
-            
-            // Scroll to keep cursor visible
-            scrollToCursor(textarea, cursorPos)
-            
-            // Calculate position (recalculate after scroll)
-            setTimeout(() => {
-              const position = calculateAutocompletePosition(textarea, wordStart + moduleName.length + 1)
-              setAutocompletePosition(position)
-            }, 0)
-            return
-          }
-        }
-      }
-      
-      // Check if we're in the middle of typing a word (not at end of line/statement)
-      const nextChar = textAfterCursor.charAt(0)
-      if (nextChar && /[\w.]/.test(nextChar)) {
-        // Still typing, don't show autocomplete
-        setShowAutocomplete(false)
-        return
-      }
-      
-      // Only show autocomplete if we have at least 1 character
-      if (currentWord.length < 1) {
-        setShowAutocomplete(false)
-        return
-      }
-      
-      // Get suggestions
-      const suggestions = getAutocompleteSuggestions(currentWord, selectedLanguage, newCode)
-      
-      if (suggestions.length > 0) {
-        setAutocompleteSuggestions(suggestions)
-        setAutocompletePrefix(currentWord)
-        setAutocompleteWordStart(wordStart)
-        setAutocompleteWordEnd(cursorPos)
-        setAutocompleteSelectedIndex(0)
-        setShowAutocomplete(true)
-        
-        // Scroll to keep cursor visible
-        scrollToCursor(textarea, cursorPos)
-        
-        // Calculate position (recalculate after scroll)
-        setTimeout(() => {
-          const position = calculateAutocompletePosition(textarea, wordStart)
-          setAutocompletePosition(position)
-        }, 0)
-      } else {
-        setShowAutocomplete(false)
-      }
-    }, 0)
+    setCode(newCode || '')
   }
 
   const handleSmartBackspace = (e) => {
@@ -2791,7 +2749,6 @@ function AppContent() {
       queue: ['Queue', 'LifoQueue', 'PriorityQueue', 'Empty', 'Full'],
       weakref: ['ref', 'proxy', 'WeakValueDictionary', 'WeakKeyDictionary', 'WeakSet', 'getweakrefcount', 'getweakrefs'],
       types: ['FunctionType', 'MethodType', 'BuiltinFunctionType', 'LambdaType', 'CodeType', 'FrameType', 'TracebackType', 'GeneratorType', 'CoroutineType', 'AsyncGeneratorType', 'ModuleType', 'SimpleNamespace', 'new_class', 'prepare_class', 'resolve_bases', 'get_original_bases', 'DynamicClassAttribute'],
-      copy: ['copy', 'deepcopy'],
       pprint: ['pprint', 'pformat', 'PrettyPrinter', 'isreadable', 'isrecursive', 'saferepr'],
       reprlib: ['repr', 'Repr', 'aRepr', 'recursive_repr']
     }
@@ -4817,8 +4774,8 @@ function AppContent() {
 
       <div style={{
         display: 'flex',
-        minHeight: 'calc(100vh - 56px)',
-        overflow: 'visible',
+        height: 'calc(100vh - 56px)',
+        overflow: 'hidden',
         position: 'relative'
       }}>
         {!sidebarCollapsed && (
@@ -4834,14 +4791,21 @@ function AppContent() {
               transition: 'width 0.2s ease',
               position: 'relative',
               minWidth: '200px',
-              maxWidth: '600px'
+              maxWidth: '600px',
+              height: '100%'
         }}>
           <div style={{ marginBottom: '20px' }}>
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: '16px'
+              marginBottom: '16px',
+              position: 'sticky',
+              top: '-20px',
+              zIndex: 2,
+              backgroundColor: theme.background,
+              paddingTop: '4px',
+              paddingBottom: '4px'
             }}>
               <h2 style={{
                 margin: 0,
@@ -5168,17 +5132,20 @@ function AppContent() {
             style={{
               position: 'absolute',
               left: 0,
-              top: 'calc(56px + 20px)',
+              top: `${collapsedButtonTop}px`,
               backgroundColor: theme.primary,
               color: '#FFFFFF',
               border: 'none',
               borderTopRightRadius: '6px',
               borderBottomRightRadius: '6px',
-              padding: '12px 6px',
+              padding: '6px 6px',
               cursor: 'pointer',
               zIndex: 10,
               boxShadow: '2px 0 8px rgba(0,0,0,0.15)',
-              transition: 'all 0.2s ease'
+              transition: 'all 0.2s ease',
+              fontSize: '12px',
+              lineHeight: 1.2,
+              minHeight: '28px'
             }}
             onMouseEnter={(e) => e.target.style.opacity = '0.9'}
             onMouseLeave={(e) => e.target.style.opacity = '1'}
@@ -5188,14 +5155,14 @@ function AppContent() {
         )}
 
         <main style={{
-          padding: sidebarCollapsed ? '32px' : '24px',
-          overflowY: 'auto',
+          padding: '0',
+          overflow: 'hidden',
           backgroundColor: theme.background,
           flex: 1,
           display: 'flex',
           flexDirection: 'column',
           width: '100%',
-          transition: 'padding 0.2s ease'
+          minHeight: 0
         }}>
           {error && (
             <div style={{
@@ -5219,7 +5186,8 @@ function AppContent() {
             <div style={{
               display: 'flex',
               flexDirection: 'column',
-              height: 'calc(100vh - 56px)',
+              flex: 1,
+              minHeight: 0,
               overflow: 'hidden'
             }}>
               {/* Header */}
@@ -5227,7 +5195,7 @@ function AppContent() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '16px 20px',
+                padding: '8px 16px',
                 backgroundColor: theme.background,
                 borderBottom: `1px solid ${theme.border}`,
                 flexShrink: 0
@@ -5235,10 +5203,10 @@ function AppContent() {
                 <h2 style={{
                   margin: '0',
                   color: theme.text,
-                  fontSize: '20px',
+                  fontSize: '18px',
                   fontWeight: '600',
                   letterSpacing: '-0.3px',
-                  lineHeight: '1.3'
+                  lineHeight: '1.4'
                 }}>
                   {selectedProblem.Title}
                 </h2>
@@ -5249,9 +5217,9 @@ function AppContent() {
                       backgroundColor: isJupyterMode ? theme.primary : theme.surface,
                       color: isJupyterMode ? '#FFFFFF' : theme.text,
                       border: `1px solid ${theme.border}`,
-                      borderRadius: '6px',
-                      padding: '6px 12px',
-                      fontSize: '12px',
+                      borderRadius: '4px',
+                      padding: '4px 10px',
+                      fontSize: '11px',
                       cursor: 'pointer'
                     }}
                   >
@@ -5268,11 +5236,11 @@ function AppContent() {
                     style={{
                       backgroundColor: theme.surface,
                       border: `1px solid ${theme.border}`,
-                      borderRadius: '6px',
-                      padding: '6px 12px',
+                      borderRadius: '4px',
+                      padding: '4px 10px',
                       color: theme.text,
                       cursor: 'pointer',
-                      fontSize: '12px'
+                      fontSize: '11px'
                     }}
                   >
                     ← Back
@@ -5298,8 +5266,10 @@ function AppContent() {
                   minWidth: '200px',
                   maxWidth: '75%'
               }}>
-                <div style={{
-                    padding: '16px 20px',
+                <div
+                  ref={problemHeaderRef}
+                  style={{
+                    padding: '8px 16px',
                     borderBottom: `1px solid ${theme.border}`,
                   display: 'flex',
                   justifyContent: 'space-between',
@@ -5309,8 +5279,9 @@ function AppContent() {
                   <h4 style={{
                     margin: 0,
                     color: theme.text,
-                      fontSize: '14px',
-                    fontWeight: '600'
+                      fontSize: '13px',
+                    fontWeight: '600',
+                    paddingLeft: '20px'
                   }}>
                     Problem Statement
                   </h4>
@@ -5318,7 +5289,7 @@ function AppContent() {
                   <div style={{
                     flex: 1,
                     overflowY: 'auto',
-                    padding: '20px',
+                    padding: '16px',
                     fontSize: '14px',
                     lineHeight: '1.6',
                     color: theme.text
@@ -5474,7 +5445,7 @@ function AppContent() {
                     minWidth: '300px'
                 }}>
                   <div style={{
-                      padding: '12px 16px',
+                      padding: '8px 16px',
                       borderBottom: `1px solid ${theme.border}`,
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -5484,7 +5455,7 @@ function AppContent() {
                     <h4 style={{
                       margin: 0,
                       color: theme.text,
-                        fontSize: '14px',
+                        fontSize: '13px',
                       fontWeight: '600'
                     }}>
                         Code Editor
@@ -5577,140 +5548,67 @@ function AppContent() {
                       position: 'relative', 
                       flex: 1, 
                       minHeight: 0,
-                      overflow: 'auto',
+                      overflow: 'hidden',
                       backgroundColor: theme.codeBackground
                     }}>
-                            <textarea
+                      <Editor
+                        height="100%"
+                        language={getMonacoLanguage(selectedLanguage)}
                         value={code}
-                        onChange={(e) => handleCodeChange(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        autoCorrect="off"
-                        autoCapitalize="off"
-                        autoComplete="off"
-                        spellCheck={false}
-                        onSelect={(e) => {
-                          // Track cursor position on selection changes
-                          const textarea = e.target
-                          const start = textarea.selectionStart
-                          const end = textarea.selectionEnd
-                          cursorPositionRef.current = { start, end }
-                          setCursorPosition({ start, end })
-                        }}
-                        onMouseUp={(e) => {
-                          // Track cursor position on mouse click
-                          const textarea = e.target
-                          const start = textarea.selectionStart
-                          const end = textarea.selectionEnd
-                          cursorPositionRef.current = { start, end }
-                          setCursorPosition({ start, end })
-                        }}
-                        onKeyUp={(e) => {
-                          // Track cursor position on arrow keys and other navigation
-                          const textarea = e.target
-                          const start = textarea.selectionStart
-                          const end = textarea.selectionEnd
-                          cursorPositionRef.current = { start, end }
-                          setCursorPosition({ start, end })
-                          // Scroll to keep cursor visible
-                          scrollToCursor(textarea, start)
-                        }}
-                              style={{
-                                width: '100%',
-                          height: '100%',
-                          minHeight: '100%',
-                          padding: '16px',
-                          border: 'none',
-                          backgroundColor: theme.codeBackground,
-                                color: theme.text,
-                          fontFamily: '"SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Liberation Mono", "Courier New", monospace',
-                          fontSize: '14px',
-                          lineHeight: '1.6',
-                          resize: 'none',
-                          outline: 'none',
+                        onChange={(value) => handleCodeChange(value || '')}
+                        theme={isDarkMode ? 'vs-dark' : 'light'}
+                        options={{
+                          minimap: { enabled: false },
+                          fontSize: 14,
+                          lineNumbers: 'on',
+                          scrollBeyondLastLine: false,
+                          automaticLayout: true,
                           tabSize: 2,
-                          boxSizing: 'border-box',
-                          margin: 0,
-                          whiteSpace: 'pre-wrap',
-                          wordWrap: 'break-word',
-                          overflowWrap: 'break-word'
-                        }}
-                        placeholder="Write your code here..."
-                      />
-                      {/* Autocomplete Dropdown */}
-                      {showAutocomplete && autocompleteSuggestions.length > 0 && (
-                        <div
-                          data-autocomplete
-                          style={{
-                            position: 'absolute',
-                            top: `${autocompletePosition.top}px`,
-                            left: `${autocompletePosition.left}px`,
-                            backgroundColor: theme.background,
-                            border: `1px solid ${theme.border}`,
-                            borderRadius: '6px',
-                            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                            zIndex: 1000,
-                            maxHeight: '300px',
-                            overflowY: 'auto',
-                            minWidth: '200px',
-                            maxWidth: '400px',
+                          wordWrap: 'on',
+                          wrappingIndent: 'indent',
                             fontFamily: '"SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Liberation Mono", "Courier New", monospace',
-                            fontSize: '13px'
-                          }}
-                          onMouseDown={(e) => e.preventDefault()} // Prevent textarea from losing focus
-                        >
-                          {autocompleteSuggestions.map((suggestion, index) => {
-                            const isSelected = index === autocompleteSelectedIndex
-                            const typeColors = {
-                              keyword: theme.primary,
-                              variable: theme.accent,
-                              function: theme.success,
-                              module: theme.warning
+                          lineHeight: 24,
+                          padding: { top: 16, bottom: 16 },
+                          scrollbar: {
+                            vertical: 'auto',
+                            horizontal: 'auto',
+                            useShadows: false,
+                            verticalHasArrows: false,
+                            horizontalHasArrows: false
+                          },
+                          readOnly: false,
+                          cursorBlinking: 'blink',
+                          cursorSmoothCaretAnimation: 'on',
+                          smoothScrolling: true,
+                          renderWhitespace: 'selection',
+                          renderLineHighlight: 'all',
+                          selectOnLineNumbers: true,
+                          roundedSelection: false,
+                          contextmenu: true,
+                          mouseWheelZoom: false,
+                          quickSuggestions: true,
+                          suggestOnTriggerCharacters: true,
+                          acceptSuggestionOnEnter: 'on',
+                          tabCompletion: 'on',
+                          wordBasedSuggestions: 'matchingDocuments',
+                          formatOnPaste: false,
+                          formatOnType: false
+                        }}
+                        onMount={(editor, monaco) => {
+                          // Add custom keyboard shortcuts
+                          editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+                            if (selectedProblem && code.trim() && !isRunning) {
+                              runCode()
                             }
-                            const typeIcons = {
-                              keyword: '🔑',
-                              variable: '📝',
-                              function: '⚙️',
-                              module: '📦'
+                          })
+                          
+                          editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyL, () => {
+                            if (selectedProblem) {
+                              clearCode()
                             }
-                            
-                            return (
-                              <div
-                                key={index}
-                                onClick={() => applyAutocomplete(suggestion)}
-                                onMouseEnter={() => setAutocompleteSelectedIndex(index)}
-                                style={{
-                                  padding: '8px 12px',
-                                  cursor: 'pointer',
-                                  backgroundColor: isSelected ? theme.primary + '20' : 'transparent',
-                                  borderBottom: index < autocompleteSuggestions.length - 1 ? `1px solid ${theme.border}` : 'none',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '8px',
-                                  transition: 'background-color 0.1s ease'
-                                }}
-                              >
-                                <span style={{ fontSize: '14px' }}>{typeIcons[suggestion.type] || '•'}</span>
-                                <span style={{ 
-                                  color: isSelected ? theme.primary : theme.text,
-                                  fontWeight: isSelected ? '600' : '400'
-                                }}>
-                                  {suggestion.label}
-                                </span>
-                                {suggestion.needsImport && (
-                                  <span style={{
-                                    marginLeft: 'auto',
-                                    fontSize: '11px',
-                                    color: theme.textSecondary,
-                                    fontStyle: 'italic'
-                                  }}>
-                                    import
-                                  </span>
-                                )}
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )}
+                          })
+                        }}
+                      />
                         </div>
 
                     {/* Console Output Section */}
@@ -5889,49 +5787,19 @@ function AppContent() {
                 </div>
                         <div style={{
                           flex: 1,
-                          overflowY: 'auto',
-                          padding: '12px 16px',
-                          fontFamily: '"SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, monospace',
-                          fontSize: '13px',
-                    lineHeight: '1.5',
-                          color: isDarkMode ? '#D4D4D4' : '#C9D1D9'
+                          overflow: 'hidden',
+                          padding: '0'
                         }}>
-                          {result ? (
-                            <div>
-                              {/* Show actual code execution output - ALWAYS show result.result first if it exists */}
-                              {result.result && result.result.trim() !== '' ? (
-                                <div style={{
-                                  whiteSpace: 'pre-wrap',
-                                  wordBreak: 'break-word',
-                                  fontFamily: 'inherit'
-                                }}>
-                                  {result.result}
-                                </div>
-                              ) : result.error && result.error.trim() !== '' ? (
-                                <div style={{ color: theme.error }}>
-                                  <span style={{ color: theme.error, fontWeight: '600' }}>Error: </span>
-                                  {result.error}
-                                </div>
-                              ) : result.compile_log && result.compile_log.trim() !== '' ? (
-                                <div style={{
-                                  whiteSpace: 'pre-wrap',
-                                  wordBreak: 'break-word',
-                                  fontFamily: 'inherit',
-                                  color: theme.error
-                                }}>
-                                  {result.compile_log}
-                                </div>
-                              ) : (
-                                <div style={{ opacity: 0.5, fontStyle: 'italic' }}>
-                                  (No output)
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <div style={{ opacity: 0.5, fontStyle: 'italic' }}>
-                              Run your code to see output here...
-                            </div>
-                          )}
+                          <TerminalComponent
+                            output={result ? (
+                              result.result && result.result.trim() !== '' ? result.result :
+                              result.error && result.error.trim() !== '' ? `\x1b[31mError: ${result.error}\x1b[0m` :
+                              result.compile_log && result.compile_log.trim() !== '' ? `\x1b[31m${result.compile_log}\x1b[0m` :
+                              '(No output)'
+                            ) : null}
+                            theme={theme}
+                            isDarkMode={isDarkMode}
+                          />
                         </div>
                       </div>
                     )}
