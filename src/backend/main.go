@@ -22,6 +22,13 @@ import (
 	"google.golang.org/api/option"
 )
 
+type ProblemPart struct {
+	PartNumber int               `json:"partNumber"`
+	Statement  string            `json:"statement"`
+	Languages  []string          `json:"languages"`
+	Stub       map[string]string `json:"stub"`
+}
+
 type Problem struct {
 	ID          string            `json:"ID"`
 	Title       string            `json:"Title"`
@@ -30,6 +37,8 @@ type Problem struct {
 	Stub        map[string]string `json:"Stub"`
 	Type        string            `json:"Type,omitempty"`        // "coding" or "system_design"
 	DrawingData string            `json:"DrawingData,omitempty"`  // Excalidraw drawing data (JSON string)
+	IsMultiPart bool              `json:"IsMultiPart,omitempty"` // Whether this is a multi-part question
+	Parts       []ProblemPart     `json:"Parts,omitempty"`       // Array of parts for multi-part questions
 }
 
 type TestCase struct {
@@ -37,8 +46,10 @@ type TestCase struct {
 	Output string
 }
 type SubmitReq struct {
-	ProblemID, Language string
-	Files               map[string]string
+	ProblemID  string            `json:"ProblemID"`
+	Language   string            `json:"Language"`
+	Files      map[string]string `json:"Files"`
+	PartNumber int               `json:"PartNumber,omitempty"` // 0 for main/part 1, 1+ for additional parts
 }
 type ExecJob struct {
 	SubmissionID  string `json:"submission_id"`
@@ -59,6 +70,7 @@ type AgentRequest struct {
 	APIKey            string `json:"apiKey,omitempty"`     // API key from frontend
 	DefaultLanguage   string `json:"defaultLanguage,omitempty"` // Default language for generated questions (e.g., "python", "javascript", "java")
 	QuestionType      string `json:"questionType,omitempty"`   // "coding" or "system_design"
+	IncludeMultiPart  bool   `json:"includeMultiPart,omitempty"` // Whether to include multi-part questions
 }
 
 type AgentResponse struct {
@@ -323,7 +335,24 @@ func submit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Printf("Decoded request: %+v", req)
-	pdir := filepath.Join(dataDir, req.ProblemID, "v1")
+	
+	// Load problem to check if it's multi-part
+	p := loadProblem(req.ProblemID)
+	if p.ID == "" {
+		http.Error(w, "problem not found", 404)
+		return
+	}
+	
+	// Determine the problem directory based on part number
+	var pdir string
+	if p.IsMultiPart && req.PartNumber > 0 && req.PartNumber <= len(p.Parts) {
+		// For multi-part questions, use the specific part directory
+		pdir = filepath.Join(dataDir, req.ProblemID, "v1", fmt.Sprintf("part%d", req.PartNumber))
+	} else {
+		// For single-part or main part, use the standard directory
+		pdir = filepath.Join(dataDir, req.ProblemID, "v1")
+	}
+	
 	if _, err := os.Stat(pdir); err != nil {
 		http.Error(w, "problem not found", 404)
 		return
@@ -907,24 +936,45 @@ func createProblem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create basic test files
-	publicDir := filepath.Join(v1Dir, "public")
-	if err := os.MkdirAll(publicDir, 0755); err != nil {
-		log.Printf("Failed to create public directory: %v", err)
-		http.Error(w, "Internal server error", 500)
-		return
-	}
+	// Create test files for main problem or parts
+	if req.IsMultiPart && len(req.Parts) > 0 {
+		// Create test directories for each part
+		for i, part := range req.Parts {
+			partDir := filepath.Join(v1Dir, fmt.Sprintf("part%d", i+1), "public")
+			if err := os.MkdirAll(partDir, 0755); err != nil {
+				log.Printf("Failed to create part %d directory: %v", i+1, err)
+				continue
+			}
+			// Create sample input and output files for this part
+			inputFile := filepath.Join(partDir, "01.in")
+			outputFile := filepath.Join(partDir, "01.out")
+			if err := os.WriteFile(inputFile, []byte(""), 0644); err != nil {
+				log.Printf("Failed to create input file for part %d: %v", i+1, err)
+			}
+			if err := os.WriteFile(outputFile, []byte(""), 0644); err != nil {
+				log.Printf("Failed to create output file for part %d: %v", i+1, err)
+			}
+		}
+	} else {
+		// Create basic test files for single-part question
+		publicDir := filepath.Join(v1Dir, "public")
+		if err := os.MkdirAll(publicDir, 0755); err != nil {
+			log.Printf("Failed to create public directory: %v", err)
+			http.Error(w, "Internal server error", 500)
+			return
+		}
 
-	// Create sample input and output files
-	inputFile := filepath.Join(publicDir, "01.in")
-	outputFile := filepath.Join(publicDir, "01.out")
+		// Create sample input and output files
+		inputFile := filepath.Join(publicDir, "01.in")
+		outputFile := filepath.Join(publicDir, "01.out")
 
-	if err := os.WriteFile(inputFile, []byte(""), 0644); err != nil {
-		log.Printf("Failed to create input file: %v", err)
-	}
+		if err := os.WriteFile(inputFile, []byte(""), 0644); err != nil {
+			log.Printf("Failed to create input file: %v", err)
+		}
 
-	if err := os.WriteFile(outputFile, []byte("Hello, World!"), 0644); err != nil {
-		log.Printf("Failed to create output file: %v", err)
+		if err := os.WriteFile(outputFile, []byte("Hello, World!"), 0644); err != nil {
+			log.Printf("Failed to create output file: %v", err)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -2072,9 +2122,60 @@ IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no 
 		languageList := fmt.Sprintf(`["%s"]`, strings.Join(languages, `", "`))
 		stubTemplates := formatLanguageStubs(languages, stubs)
 		
+		multiPartSection := ""
+		if req.IncludeMultiPart {
+			multiPartSection = fmt.Sprintf(`
+
+═══════════════════════════════════════════════════════════════
+CRITICAL: MULTI-PART QUESTIONS REQUIRED
+═══════════════════════════════════════════════════════════════
+
+You MUST generate multi-part questions! Approximately 30-40%% of the questions should be multi-part questions with follow-ups.
+
+For multi-part questions, use this EXACT format:
+{
+  "id": "unique-kebab-case-id",
+  "title": "Descriptive Title",
+  "statement": "Initial problem description (Part 1 - must be solvable independently)",
+  "type": "coding",
+  "isMultiPart": true,
+  "languages": %s,
+  "stub": {
+%s  },
+  "parts": [
+    {
+      "partNumber": 1,
+      "statement": "Follow-up question that builds on Part 1. Reference the solution from Part 1.",
+      "languages": %s,
+      "stub": {
+%s      }
+    },
+    {
+      "partNumber": 2,
+      "statement": "Another follow-up that builds on Parts 1 and 2. Reference previous solutions.",
+      "languages": %s,
+      "stub": {
+%s      }
+    }
+  ]
+}
+
+IMPORTANT RULES FOR MULTI-PART QUESTIONS:
+1. The main "statement" field is Part 1 - it must be a complete, standalone problem
+2. Each part in the "parts" array is a follow-up (Part 2, Part 3, etc.)
+3. Each part should progressively build on previous parts
+4. Each part must have its own "statement" and "stub" code
+5. Parts should reference or extend solutions from previous parts
+6. You can have 2-4 parts per multi-part question
+
+For single-part questions (the remaining 60-70%%), use the standard format without "isMultiPart" or "parts" fields.
+
+═══════════════════════════════════════════════════════════════`, languageList, stubTemplates, languageList, stubTemplates, languageList, stubTemplates)
+		}
+		
 		prompt = fmt.Sprintf(`You are a coding interview question generator. Generate exactly %d unique coding interview questions for a %s %s position at %s.%s
 
-CRITICAL: You MUST return ONLY valid JSON. No markdown, no explanations, no code blocks - just pure JSON.
+CRITICAL: You MUST return ONLY valid JSON. No markdown, no explanations, no code blocks - just pure JSON.%s
 
 Requirements:
 - Questions should be appropriate for %s level
@@ -2089,7 +2190,7 @@ For %s level %s roles at %s, consider:
 - Technologies commonly used in %s development
 - Problem complexity appropriate for %s level
 
-Return ONLY a JSON array (no markdown, no code blocks, no explanations) with this exact format:
+Return ONLY a JSON array (no markdown, no code blocks, no explanations). Use the format shown above for multi-part questions, or this format for single-part questions:
 [
   {
     "id": "unique-kebab-case-id",
@@ -2103,7 +2204,7 @@ Return ONLY a JSON array (no markdown, no code blocks, no explanations) with thi
 ]
 
 IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no code blocks, no explanations.`,
-			req.Count, req.Level, req.Role, req.Company, interviewContext, req.Level, req.Role, strings.Join(languages, ", "), defaultLang, req.Level, req.Role, req.Company, req.Role, req.Role, req.Level, languageList, stubTemplates)
+			req.Count, req.Level, req.Role, req.Company, interviewContext, multiPartSection, req.Level, req.Role, strings.Join(languages, ", "), defaultLang, req.Level, req.Role, req.Company, req.Role, req.Role, req.Level, languageList, stubTemplates)
 	}
 
 	// Retry logic for rate limiting with exponential backoff
@@ -2247,6 +2348,8 @@ IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no 
 		Stub        map[string]string `json:"stub"`
 		Type        string            `json:"type,omitempty"`
 		DrawingData string            `json:"drawingData,omitempty"`
+		IsMultiPart bool              `json:"isMultiPart,omitempty"`
+		Parts       []ProblemPart     `json:"parts,omitempty"`
 	}
 
 	if err := json.Unmarshal([]byte(cleanText), &aiProblems); err != nil {
@@ -2300,6 +2403,8 @@ IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no 
 			Stub:        aiProblem.Stub,
 			Type:        problemType,
 			DrawingData: aiProblem.DrawingData,
+			IsMultiPart: aiProblem.IsMultiPart,
+			Parts:       aiProblem.Parts,
 		}
 	}
 
@@ -2376,9 +2481,60 @@ IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no 
 		languageList := fmt.Sprintf(`["%s"]`, strings.Join(languages, `", "`))
 		stubTemplates := formatLanguageStubs(languages, stubs)
 		
+		multiPartSection := ""
+		if req.IncludeMultiPart {
+			multiPartSection = fmt.Sprintf(`
+
+═══════════════════════════════════════════════════════════════
+CRITICAL: MULTI-PART QUESTIONS REQUIRED
+═══════════════════════════════════════════════════════════════
+
+You MUST generate multi-part questions! Approximately 30-40%% of the questions should be multi-part questions with follow-ups.
+
+For multi-part questions, use this EXACT format:
+{
+  "id": "unique-kebab-case-id",
+  "title": "Descriptive Title",
+  "statement": "Initial problem description (Part 1 - must be solvable independently)",
+  "type": "coding",
+  "isMultiPart": true,
+  "languages": %s,
+  "stub": {
+%s  },
+  "parts": [
+    {
+      "partNumber": 1,
+      "statement": "Follow-up question that builds on Part 1. Reference the solution from Part 1.",
+      "languages": %s,
+      "stub": {
+%s      }
+    },
+    {
+      "partNumber": 2,
+      "statement": "Another follow-up that builds on Parts 1 and 2. Reference previous solutions.",
+      "languages": %s,
+      "stub": {
+%s      }
+    }
+  ]
+}
+
+IMPORTANT RULES FOR MULTI-PART QUESTIONS:
+1. The main "statement" field is Part 1 - it must be a complete, standalone problem
+2. Each part in the "parts" array is a follow-up (Part 2, Part 3, etc.)
+3. Each part should progressively build on previous parts
+4. Each part must have its own "statement" and "stub" code
+5. Parts should reference or extend solutions from previous parts
+6. You can have 2-4 parts per multi-part question
+
+For single-part questions (the remaining 60-70%%), use the standard format without "isMultiPart" or "parts" fields.
+
+═══════════════════════════════════════════════════════════════`, languageList, stubTemplates, languageList, stubTemplates, languageList, stubTemplates)
+		}
+		
 		prompt = fmt.Sprintf(`You are a coding interview question generator. Generate exactly %d unique coding interview questions for a %s %s position at %s.%s
 
-CRITICAL: You MUST return ONLY valid JSON. No markdown, no explanations, no code blocks - just pure JSON.
+CRITICAL: You MUST return ONLY valid JSON. No markdown, no explanations, no code blocks - just pure JSON.%s
 
 Requirements:
 - Questions should be appropriate for %s level
@@ -2388,7 +2544,12 @@ Requirements:
 - Include sample input/output examples
 - Provide starter code stubs for %s (with %s as the primary/default language)
 
-Return ONLY a JSON array (no markdown, no code blocks, no explanations) with this exact format:
+For %s level %s roles at %s, consider:
+- %s-specific challenges and scenarios
+- Technologies commonly used in %s development
+- Problem complexity appropriate for %s level
+
+Return ONLY a JSON array (no markdown, no code blocks, no explanations). Use the format shown above for multi-part questions, or this format for single-part questions:
 [
   {
     "id": "unique-kebab-case-id",
@@ -2402,7 +2563,7 @@ Return ONLY a JSON array (no markdown, no code blocks, no explanations) with thi
 ]
 
 IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no code blocks, no explanations.`,
-			req.Count, req.Level, req.Role, req.Company, interviewContext, req.Level, req.Role, strings.Join(languages, ", "), defaultLang, languageList, stubTemplates)
+			req.Count, req.Level, req.Role, req.Company, interviewContext, multiPartSection, req.Level, req.Role, strings.Join(languages, ", "), defaultLang, req.Level, req.Role, req.Company, req.Role, req.Role, req.Level, languageList, stubTemplates)
 	}
 
 	// Prepare request
@@ -2556,9 +2717,60 @@ IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no 
 		languageList := fmt.Sprintf(`["%s"]`, strings.Join(languages, `", "`))
 		stubTemplates := formatLanguageStubs(languages, stubs)
 		
+		multiPartSection := ""
+		if req.IncludeMultiPart {
+			multiPartSection = fmt.Sprintf(`
+
+═══════════════════════════════════════════════════════════════
+CRITICAL: MULTI-PART QUESTIONS REQUIRED
+═══════════════════════════════════════════════════════════════
+
+You MUST generate multi-part questions! Approximately 30-40%% of the questions should be multi-part questions with follow-ups.
+
+For multi-part questions, use this EXACT format:
+{
+  "id": "unique-kebab-case-id",
+  "title": "Descriptive Title",
+  "statement": "Initial problem description (Part 1 - must be solvable independently)",
+  "type": "coding",
+  "isMultiPart": true,
+  "languages": %s,
+  "stub": {
+%s  },
+  "parts": [
+    {
+      "partNumber": 1,
+      "statement": "Follow-up question that builds on Part 1. Reference the solution from Part 1.",
+      "languages": %s,
+      "stub": {
+%s      }
+    },
+    {
+      "partNumber": 2,
+      "statement": "Another follow-up that builds on Parts 1 and 2. Reference previous solutions.",
+      "languages": %s,
+      "stub": {
+%s      }
+    }
+  ]
+}
+
+IMPORTANT RULES FOR MULTI-PART QUESTIONS:
+1. The main "statement" field is Part 1 - it must be a complete, standalone problem
+2. Each part in the "parts" array is a follow-up (Part 2, Part 3, etc.)
+3. Each part should progressively build on previous parts
+4. Each part must have its own "statement" and "stub" code
+5. Parts should reference or extend solutions from previous parts
+6. You can have 2-4 parts per multi-part question
+
+For single-part questions (the remaining 60-70%%), use the standard format without "isMultiPart" or "parts" fields.
+
+═══════════════════════════════════════════════════════════════`, languageList, stubTemplates, languageList, stubTemplates, languageList, stubTemplates)
+		}
+		
 		prompt = fmt.Sprintf(`You are a coding interview question generator. Generate exactly %d unique coding interview questions for a %s %s position at %s.%s
 
-CRITICAL: You MUST return ONLY valid JSON. No markdown, no explanations, no code blocks - just pure JSON.
+CRITICAL: You MUST return ONLY valid JSON. No markdown, no explanations, no code blocks - just pure JSON.%s
 
 Requirements:
 - Questions should be appropriate for %s level
@@ -2568,7 +2780,12 @@ Requirements:
 - Include sample input/output examples
 - Provide starter code stubs for %s (with %s as the primary/default language)
 
-Return ONLY a JSON array (no markdown, no code blocks, no explanations) with this exact format:
+For %s level %s roles at %s, consider:
+- %s-specific challenges and scenarios
+- Technologies commonly used in %s development
+- Problem complexity appropriate for %s level
+
+Return ONLY a JSON array (no markdown, no code blocks, no explanations). Use the format shown above for multi-part questions, or this format for single-part questions:
 [
   {
     "id": "unique-kebab-case-id",
@@ -2582,7 +2799,7 @@ Return ONLY a JSON array (no markdown, no code blocks, no explanations) with thi
 ]
 
 IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no code blocks, no explanations.`,
-			req.Count, req.Level, req.Role, req.Company, interviewContext, req.Level, req.Role, strings.Join(languages, ", "), defaultLang, languageList, stubTemplates)
+			req.Count, req.Level, req.Role, req.Company, interviewContext, multiPartSection, req.Level, req.Role, strings.Join(languages, ", "), defaultLang, req.Level, req.Role, req.Company, req.Role, req.Role, req.Level, languageList, stubTemplates)
 	}
 
 	// Prepare request
@@ -2676,6 +2893,8 @@ func parseAIResponse(responseText string, req AgentRequest) ([]Problem, error) {
 		Stub        map[string]string `json:"stub"`
 		Type        string            `json:"type,omitempty"`
 		DrawingData string            `json:"drawingData,omitempty"`
+		IsMultiPart bool              `json:"isMultiPart,omitempty"`
+		Parts       []ProblemPart     `json:"parts,omitempty"`
 	}
 
 	if err := json.Unmarshal([]byte(cleanText), &aiProblems); err != nil {
@@ -2728,6 +2947,8 @@ func parseAIResponse(responseText string, req AgentRequest) ([]Problem, error) {
 			Stub:        aiProblem.Stub,
 			Type:        problemType,
 			DrawingData: aiProblem.DrawingData,
+			IsMultiPart: aiProblem.IsMultiPart,
+			Parts:       aiProblem.Parts,
 		}
 	}
 
