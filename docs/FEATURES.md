@@ -6,7 +6,73 @@ This document provides a comprehensive overview of all features in CeesarCode, i
 
 ---
 
-## ✨ Latest Features (v1.4.0)
+## ✨ Latest Features (v1.6.0)
+
+### 1. Multi-Part Coding Questions
+
+**Description**: Support for coding questions with progressive follow-up parts that build upon each other.
+
+**Features**:
+- Create questions with 2, 3, 4+ parts that progressively increase in complexity
+- Part 1 is standalone, Part 2 builds on Part 1, Part 3 builds on Parts 1 and 2
+- Part-specific problem statements and code stubs
+- Independent test cases for each part
+- Part navigation with Previous/Next buttons
+- Visual indicators showing current part (e.g., "Part 2 of 3")
+- Keyboard shortcuts: `Ctrl/Cmd + ←` (previous part), `Ctrl/Cmd + →` (next part)
+- Code persistence per part - each part maintains its own code independently
+- Multi-part badge in sidebar for easy identification
+- Works for both manually created and AI-generated questions
+
+**Manual Creation**:
+1. Click "Create New Problem"
+2. Fill in title and Part 1 statement
+3. Check "Multi-part Question (with follow-ups)"
+4. Click "+ Add Part" for each additional part
+5. Write follow-up statements for Part 2, Part 3, etc.
+6. Create test cases for each part via Test Cases tab
+
+**AI Generation**:
+1. Click "AI Agent" button
+2. Check "Include Multi-part Questions"
+3. AI generates mix of single and multi-part questions (30-40% multi-part when enabled)
+4. Works with all AI providers (Gemini, OpenAI, Claude)
+
+**Solving Multi-Part Questions**:
+1. Select a multi-part question from sidebar (look for "Multi-Part (X)" badge)
+2. See Part 1 statement and navigation buttons
+3. Write code for Part 1
+4. Click "Part 2" or press `Ctrl/Cmd + →`
+5. See Part 2 statement (builds on Part 1)
+6. Code from Part 1 is preserved
+7. Write code for Part 2
+8. Submit tests against Part 2 test cases
+9. Continue for all parts
+
+**Technical Details**:
+- Test case structure: `v1/public/` for Part 1, `v1/part2/public/` for Part 2, etc.
+- Each part has its own test directory
+- Backward compatible - all existing single-part questions work unchanged
+- Part-specific code storage and retrieval
+- Language switching preserves code per part
+
+---
+
+## ✨ Previous Features (v1.5.0)
+
+### 1. Professional Editor & Terminal Integration
+
+**Description**: Replaced custom editor and console with industry-standard Monaco Editor and xterm.js terminal.
+
+**Features**:
+- Monaco Editor (VS Code editor) with full IntelliSense
+- xterm.js terminal emulator for professional output display
+- Optimized layout with independent pane scrolling
+- Sticky Problems pane header
+
+---
+
+## ✨ Previous Features (v1.4.0)
 
 ### 1. System Design Questions with Excalidraw Canvas
 

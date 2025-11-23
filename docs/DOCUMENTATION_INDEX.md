@@ -46,6 +46,7 @@ Complete guide to all CeesarCode documentation files.
 - **[Project Structure](./PROJECT_STRUCTURE.md)** - Directory organization and file structure
 - **[Features](./FEATURES.md)** - Complete feature list
 - **[Changelog](./CHANGELOG.md)** - Version history and updates
+- **[Multi-Part Questions](./MULTI_PART_QUESTIONS.md)** - Technical documentation for multi-part coding questions
 
 
 ## 📋 Documentation by Topic
@@ -108,7 +109,8 @@ docs/
 └── Project Info/
     ├── PROJECT_STRUCTURE.md     # File organization
     ├── FEATURES.md              # Feature list
-    └── CHANGELOG.md             # Version history
+    ├── CHANGELOG.md             # Version history
+    └── MULTI_PART_QUESTIONS.md  # Multi-part questions technical docs
 ```
 
 ## 🎯 Finding What You Need
@@ -127,6 +129,7 @@ docs/
 - **...the architecture** → [README.md](./README.md#️-architecture-high-level)
 - **...all features** → [FEATURES.md](./FEATURES.md)
 - **...file structure** → [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md)
+- **...multi-part questions** → [MULTI_PART_QUESTIONS.md](./MULTI_PART_QUESTIONS.md)
 - **...recent changes** → [CHANGELOG.md](./CHANGELOG.md)
 - **...API endpoints** → [BACKEND_API.md](./BACKEND_API.md#api-endpoints)
 - **...UI components** → [FRONTEND_UI.md](./FRONTEND_UI.md#core-components)

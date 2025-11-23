@@ -1,0 +1,12 @@
+{
+  "ID": "job-scheduler",
+  "Title": "Job Scheduler",
+  "Statement": "Design a job scheduler for Reddit",
+  "Languages": [
+    "python"
+  ],
+  "Stub": {
+    "python": ""
+  },
+  "Type": "system_design"
+}

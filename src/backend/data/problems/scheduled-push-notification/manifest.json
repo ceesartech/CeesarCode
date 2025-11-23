@@ -1,0 +1,12 @@
+{
+  "ID": "scheduled-push-notification",
+  "Title": "Scheduled Push-Notification",
+  "Statement": "Design a scheduled push notification system",
+  "Languages": [
+    "python"
+  ],
+  "Stub": {
+    "python": ""
+  },
+  "Type": "system_design"
+}

@@ -2,6 +2,53 @@
 
 ## Recent Updates
 
+### Version 1.6.0 - Multi-Part Coding Questions
+
+#### ✨ New Features
+
+1. **Multi-Part Coding Questions**
+   - Support for questions with progressive follow-up parts
+   - Part 1 is standalone, subsequent parts build on previous ones
+   - Part-specific problem statements and code stubs
+   - Independent test cases for each part
+   - Part navigation with Previous/Next buttons and keyboard shortcuts
+   - Visual indicators showing current part (e.g., "Part 2 of 3")
+   - Code persistence per part
+   - Multi-part badge in sidebar for identification
+   - Works for both manually created and AI-generated questions
+
+2. **AI Multi-Part Generation**
+   - "Include Multi-part Questions" checkbox in AI generation form
+   - AI generates mix of single and multi-part questions (30-40% multi-part when enabled)
+   - Works with all AI providers (Gemini, OpenAI, Claude)
+   - Progressive complexity in follow-up parts
+
+#### 🔧 Improvements
+
+1. **Problem Management**
+   - Multi-part questions clearly marked in sidebar
+   - Better organization of test cases per part
+   - Improved code management for multi-part scenarios
+
+2. **UI Enhancements**
+   - Part navigation controls in Problem Statement header
+   - Keyboard shortcuts for part navigation (`Ctrl/Cmd + ←/→`)
+   - Visual part indicators
+
+#### 🐛 Bug Fixes
+
+1. **AI Generation**
+   - Fixed parsing of multi-part questions from AI responses
+   - Correct handling of `IsMultiPart` and `Parts` fields in all AI providers
+   - Proper test case directory creation for multi-part questions
+
+2. **Clean AI Button**
+   - Improved error handling and user feedback
+   - Better state management during cleanup
+   - Disabled state during operation to prevent multiple clicks
+
+---
+
 ### Version 1.5.0 - Professional Editor & Terminal Integration
 
 #### ✨ New Features
