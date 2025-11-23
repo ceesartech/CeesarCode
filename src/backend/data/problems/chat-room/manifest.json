@@ -1,0 +1,12 @@
+{
+  "ID": "chat-room",
+  "Title": "Chat Room",
+  "Statement": "Design a subreddit chat room",
+  "Languages": [
+    "python"
+  ],
+  "Stub": {
+    "python": ""
+  },
+  "Type": "system_design"
+}

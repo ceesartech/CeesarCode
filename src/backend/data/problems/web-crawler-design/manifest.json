@@ -1,0 +1,12 @@
+{
+  "ID": "web-crawler-design",
+  "Title": "Web-Crawler Design",
+  "Statement": "Imagine that you are designing a web crawler. This web crawler accepts links from users and then crawls the domain for the link and notifies the users when the crawl is done. The crawler should save the web pages and find other links on the web pages as it crawls.",
+  "Languages": [
+    "python"
+  ],
+  "Stub": {
+    "python": ""
+  },
+  "Type": "system_design"
+}

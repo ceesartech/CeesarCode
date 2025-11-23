@@ -1,0 +1,12 @@
+{
+  "ID": "game-leaderboard",
+  "Title": "Game Leaderboard",
+  "Statement": "Design a leaderboard for an online video game",
+  "Languages": [
+    "python"
+  ],
+  "Stub": {
+    "python": ""
+  },
+  "Type": "system_design"
+}

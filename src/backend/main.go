@@ -2318,6 +2318,8 @@ IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no 
 		Stub        map[string]string `json:"stub"`
 		Type        string            `json:"type,omitempty"`
 		DrawingData string            `json:"drawingData,omitempty"`
+		IsMultiPart bool              `json:"isMultiPart,omitempty"`
+		Parts       []Part            `json:"parts,omitempty"`
 	}
 
 	if err := json.Unmarshal([]byte(cleanText), &aiProblems); err != nil {
@@ -2371,6 +2373,8 @@ IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no 
 			Stub:        aiProblem.Stub,
 			Type:        problemType,
 			DrawingData: aiProblem.DrawingData,
+			IsMultiPart: aiProblem.IsMultiPart,
+			Parts:       aiProblem.Parts,
 		}
 	}
 
@@ -2799,6 +2803,8 @@ func parseAIResponse(responseText string, req AgentRequest) ([]Problem, error) {
 		Stub        map[string]string `json:"stub"`
 		Type        string            `json:"type,omitempty"`
 		DrawingData string            `json:"drawingData,omitempty"`
+		IsMultiPart bool              `json:"isMultiPart,omitempty"`
+		Parts       []Part            `json:"parts,omitempty"`
 	}
 
 	if err := json.Unmarshal([]byte(cleanText), &aiProblems); err != nil {
@@ -2851,6 +2857,8 @@ func parseAIResponse(responseText string, req AgentRequest) ([]Problem, error) {
 			Stub:        aiProblem.Stub,
 			Type:        problemType,
 			DrawingData: aiProblem.DrawingData,
+			IsMultiPart: aiProblem.IsMultiPart,
+			Parts:       aiProblem.Parts,
 		}
 	}
 

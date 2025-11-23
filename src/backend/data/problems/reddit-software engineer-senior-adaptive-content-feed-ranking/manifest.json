@@ -1,0 +1,35 @@
+{
+  "ID": "reddit-software engineer-senior-adaptive-content-feed-ranking",
+  "Title": "Adaptive Content Feed Ranking",
+  "Statement": "Reddit's success relies on delivering relevant content to its users. A critical component of this is the feed ranking algorithm, which balances the 'freshness' of content with its 'popularity'.\n\n**Part 1: Basic Hotness Score Calculation**\nImplement a function `calculate_hotness_score(upvotes: int, downvotes: int, submission_time_epoch_seconds: int, current_time_epoch_seconds: int) -\u003e float` that computes a 'hotness' score for a post. The score should generally increase with upvotes and decrease with time since submission. A simple formula could be: `(upvotes - downvotes) / max(1, log10(time_elapsed_seconds / DECAY_FACTOR_SECONDS + 1))`. Use a `DECAY_FACTOR_SECONDS` of 45000 (roughly 12.5 hours).\n\n*Example:*\n`upvotes = 100`, `downvotes = 10`, `submission_time = 1678886400` (Mar 15, 2023 00:00:00 GMT), `current_time = 1678972800` (Mar 16, 2023 00:00:00 GMT)\n`time_elapsed_seconds = 86400`\n`score = (100 - 10) / log10(86400 / 45000 + 1) = 90 / log10(1.92 + 1) = 90 / log10(2.92) ≈ 90 / 0.465 ≈ 193.5`",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {
+    "cpp": "#include \u003ccmath\u003e\n#include \u003calgorithm\u003e\n\nconst long long DECAY_FACTOR_SECONDS = 45000;\n\nclass Solution {\npublic:\n    double calculateHotnessScore(int upvotes, int downvotes, long long submissionTimeEpochSeconds, long long currentTimeEpochSeconds) {\n        // Your code here\n        return 0.0;\n    }\n};",
+    "go": "package main\n\nimport (\n\t\"math\"\n)\n\nconst DECAY_FACTOR_SECONDS = 45000\n\nfunc calculateHotnessScore(upvotes, downvotes int, submissionTimeEpochSeconds, currentTimeEpochSeconds int64) float64 {\n\t// Your code here\n\treturn 0.0\n}",
+    "java": "import java.util.concurrent.TimeUnit;\n\nclass Solution {\n    private static final long DECAY_FACTOR_SECONDS = 45000;\n\n    public double calculateHotnessScore(int upvotes, int downvotes, long submissionTimeEpochSeconds, long currentTimeEpochSeconds) {\n        // Your code here\n        return 0.0;\n    }\n}",
+    "javascript": "const DECAY_FACTOR_SECONDS = 45000;\n\nfunction calculateHotnessScore(upvotes, downvotes, submissionTimeEpochSeconds, currentTimeEpochSeconds) {\n    // Your code here\n}",
+    "python": "import math\n\nDECAY_FACTOR_SECONDS = 45000\n\ndef calculate_hotness_score(upvotes: int, downvotes: int, submission_time_epoch_seconds: int, current_time_epoch_seconds: int) -\u003e float:\n    # Your code here\n    pass",
+    "rust": "struct Solution;\n\nconst DECAY_FACTOR_SECONDS: f64 = 45000.0;\n\nimpl Solution {\n    fn calculate_hotness_score(upvotes: i32, downvotes: i32, submission_time_epoch_seconds: i64, current_time_epoch_seconds: i64) -\u003e f64 {\n        // Your code here\n        0.0\n    }\n}"
+  },
+  "Type": "coding",
+  "IsMultiPart": true,
+  "Parts": [
+    {
+      "partNumber": 2,
+      "statement": "**Part 2: Personalized Feed Generation with Preferences**\nBuilding on Part 1, now implement a function `get_ranked_feed(posts: List[Dict], user_preferences: Dict) -\u003e List[Dict]`. Each post in `posts` is a dictionary with `id`, `subreddit_id`, `upvotes`, `downvotes`, `submission_time_epoch_seconds`. `user_preferences` is a dictionary that might contain a list of `muted_subreddits` (subreddits whose posts should be entirely excluded from the feed). Use `current_time_epoch_seconds` from Part 1. The function should return the posts sorted by their calculated hotness score in descending order, after filtering out muted subreddits.\n\n*Example:*\n`posts = [{'id': 'p1', 'subreddit_id': 'r/news', 'upvotes': 100, 'downvotes': 10, 'submission_time_epoch_seconds': 1678886400}, {'id': 'p2', 'subreddit_id': 'r/sports', 'upvotes': 50, 'downvotes': 5, 'submission_time_epoch_seconds': 1678950000}]`\n`user_preferences = {'muted_subreddits': ['r/news']}`\n`current_time_epoch_seconds = 1678972800`\nExpected output: `[{'id': 'p2', ...}]` (assuming p2 has a higher or only relevant score after filtering).",
+      "stub": null
+    },
+    {
+      "partNumber": 3,
+      "statement": "**Part 3: Efficient Real-time Top-K Feed Updates**\nConsider a scenario where there are millions of posts and millions of users, and feed ranking needs to be updated and served efficiently in real-time. Describe how you would extend your solution to handle continuous stream of new posts and votes, maintaining the top K posts for a user's feed without re-calculating all scores. Focus on the data structures and algorithms that would enable efficient updates and queries for the top posts, given that `current_time_epoch_seconds` is constantly changing and `upvotes`/`downvotes` can change frequently. You don't need to implement a full distributed system, but rather outline the core data structures and logic. For the coding part, implement a `FeedRanker` class with methods `add_post(post)`, `update_vote(post_id, vote_change)`, and `get_top_k_feed(user_preferences, k)` that can efficiently return the top K posts, considering a fixed `current_time` for simplicity in this coding exercise, but discuss the real-time implications.",
+      "stub": null
+    }
+  ]
+}

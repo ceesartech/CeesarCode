@@ -5231,6 +5231,7 @@ function AppContent() {
                 </button>
                 <button
                   onClick={async () => {
+                    if (isLoadingProblems) return // Prevent multiple clicks
                     if (!window.confirm('This will remove all AI-generated problems. Are you sure?')) {
                       return
                     }
@@ -5241,24 +5242,38 @@ function AppContent() {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' }
                       })
-                      if (!response.ok) throw new Error('Failed to clean AI problems')
+                      
+                      if (!response.ok) {
+                        const errorText = await response.text()
+                        throw new Error(`HTTP ${response.status}: ${errorText || 'Failed to clean AI problems'}`)
+                      }
                       
                       const result = await response.json()
-                      alert(result.message)
+                      alert(result.message || `Cleaned ${result.count || 0} AI-generated problems`)
                       
                       // Refresh the problems list
                       const refreshResponse = await fetch('/api/problems')
                       if (refreshResponse.ok) {
                         const data = await refreshResponse.json()
                         setProblems(data || [])
+                        // Clear selected problem if it was AI-generated and was deleted
+                        if (selectedProblem) {
+                          const stillExists = data.some(p => (p.ID || p.id) === (selectedProblem.ID || selectedProblem.id))
+                          if (!stillExists) {
+                            setSelectedProblem(null)
+                            setResult(null)
+                            setError(null)
+                          }
+                        }
                       }
                     } catch (err) {
                       console.error('Error cleaning AI problems:', err)
-                      alert('Failed to clean AI problems: ' + err.message)
+                      alert('Failed to clean AI problems: ' + (err.message || 'Unknown error'))
                     } finally {
                       setIsLoadingProblems(false)
                     }
                   }}
+                  disabled={isLoadingProblems}
                   style={{
                     backgroundColor: theme.error,
                     color: '#FFFFFF',
@@ -5266,14 +5281,23 @@ function AppContent() {
                     borderRadius: '6px',
                     padding: '8px 12px',
                     fontSize: '12px',
-                    cursor: 'pointer',
+                    cursor: isLoadingProblems ? 'not-allowed' : 'pointer',
                     fontWeight: '500',
                     transition: 'all 0.2s ease',
                     display: 'flex',
-                    alignItems: 'center'
+                    alignItems: 'center',
+                    opacity: isLoadingProblems ? 0.6 : 1
                   }}
-                  onMouseEnter={(e) => e.target.style.opacity = '0.9'}
-                  onMouseLeave={(e) => e.target.style.opacity = '1'}
+                  onMouseEnter={(e) => {
+                    if (!isLoadingProblems) {
+                      e.target.style.opacity = '0.9'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isLoadingProblems) {
+                      e.target.style.opacity = '1'
+                    }
+                  }}
                 >
                   <span style={{ marginRight: '4px' }}>🗑</span>Clean AI
                 </button>

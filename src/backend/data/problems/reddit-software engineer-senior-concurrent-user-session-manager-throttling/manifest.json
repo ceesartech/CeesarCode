@@ -1,0 +1,35 @@
+{
+  "ID": "reddit-software engineer-senior-concurrent-user-session-manager-throttling",
+  "Title": "Concurrent User Session Manager with Throttling",
+  "Statement": "As a backend engineer at Reddit, managing user sessions and ensuring fair resource usage through throttling is crucial. You need to implement a `SessionManager` that handles user logins/logouts and enforces a basic rate limit for requests.\n\n**Part 1: Basic Session Management**\nImplement a `SessionManager` class with the following methods:\n- `__init__(self)`: Initializes the session manager.\n- `login(self, user_id: str) -\u003e bool`: Marks a user as logged in. Returns `True` if the user was successfully logged in (wasn't already logged in), `False` otherwise.\n- `logout(self, user_id: str) -\u003e bool`: Marks a user as logged out. Returns `True` if the user was successfully logged out (was logged in), `False` otherwise.\n- `is_active(self, user_id: str) -\u003e bool`: Returns `True` if the user is currently logged in, `False` otherwise.\n\n*Example:*\n`manager = SessionManager()`\n`manager.login('user1')` -\u003e `True`\n`manager.is_active('user1')` -\u003e `True`\n`manager.login('user1')` -\u003e `False`\n`manager.logout('user1')` -\u003e `True`\n`manager.is_active('user1')` -\u003e `False`",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {
+    "cpp": "#include \u003cstring\u003e\n#include \u003cunordered_set\u003e\n\nclass SessionManager {\npublic:\n    SessionManager() {\n        // Your code here\n    }\n\n    bool login(const std::string\u0026 user_id) {\n        // Your code here\n        return false;\n    }\n\n    bool logout(const std::string\u0026 user_id) {\n        // Your code here\n        return false;\n    }\n\n    bool isActive(const std::string\u0026 user_id) {\n        // Your code here\n        return false;\n    }\n};",
+    "go": "package main\n\nimport (\n\t\"sync\"\n)\n\ntype SessionManager struct {\n\t// Your code here\n}\n\nfunc NewSessionManager() *SessionManager {\n\t// Your code here\n\treturn nil\n}\n\nfunc (sm *SessionManager) Login(userId string) bool {\n\t// Your code here\t\n\treturn false\n}\n\nfunc (sm *SessionManager) Logout(userId string) bool {\n\t// Your code here\n\treturn false\n}\n\nfunc (sm *SessionManager) IsActive(userId string) bool {\n\t// Your code here\n\treturn false\n}",
+    "java": "import java.util.HashSet;\nimport java.util.Set;\n\nclass SessionManager {\n    public SessionManager() {\n        // Your code here\n    }\n\n    public boolean login(String userId) {\n        // Your code here\n        return false;\n    }\n\n    public boolean logout(String userId) {\n        // Your code here\n        return false;\n    }\n\n    public boolean isActive(String userId) {\n        // Your code here\n        return false;\n    }\n}",
+    "javascript": "class SessionManager {\n    constructor() {\n        // Your code here\n    }\n\n    login(userId) {\n        // Your code here\n    }\n\n    logout(userId) {\n        // Your code here\n    }\n\n    isActive(userId) {\n        // Your code here\n    }\n}",
+    "python": "from typing import Dict, Set\n\nclass SessionManager:\n    def __init__(self):\n        # Your code here\n        pass\n\n    def login(self, user_id: str) -\u003e bool:\n        # Your code here\n        pass\n\n    def logout(self, user_id: str) -\u003e bool:\n        # Your code here\n        pass\n\n    def is_active(self, user_id: str) -\u003e bool:\n        # Your code here\n        pass",
+    "rust": "use std::collections::HashSet;\n\npub struct SessionManager {\n    // Your code here\n}\n\nimpl SessionManager {\n    pub fn new() -\u003e Self {\n        // Your code here\n        unimplemented!()\n    }\n\n    pub fn login(\u0026mut self, user_id: String) -\u003e bool {\n        // Your code here\n        unimplemented!()\n    }\n\n    pub fn logout(\u0026mut self, user_id: String) -\u003e bool {\n        // Your code here\n        unimplemented!()\n    }\n\n    pub fn is_active(\u0026self, user_id: \u0026str) -\u003e bool {\n        // Your code here\n        unimplemented!()\n    }\n}"
+  },
+  "Type": "coding",
+  "IsMultiPart": true,
+  "Parts": [
+    {
+      "partNumber": 2,
+      "statement": "**Part 2: Request Throttling (Fixed Window Counter)**\nEnhance the `SessionManager` class to include a `request_allowed(self, user_id: str, current_time_epoch_seconds: int) -\u003e bool` method. This method should implement a fixed-window rate limiter for each user. For example, a user might be allowed `MAX_REQUESTS` (e.g., 5) within a `TIME_WINDOW_SECONDS` (e.g., 10 seconds). If a user makes a request within their current window, their request count for that window increments. If the count exceeds `MAX_REQUESTS`, subsequent requests within the same window are denied. When the `TIME_WINDOW_SECONDS` passes, a new window begins, and the count resets.\n\n`MAX_REQUESTS = 5`, `TIME_WINDOW_SECONDS = 10`\n\n*Example (simplified, assuming `current_time` updates appropriately):*\n`manager.request_allowed('user1', 0)` -\u003e `True` (count: 1)\n`manager.request_allowed('user1', 1)` -\u003e `True` (count: 2)\n... (3 more `True` calls)\n`manager.request_allowed('user1', 5)` -\u003e `True` (count: 5)\n`manager.request_allowed('user1', 6)` -\u003e `False` (count still 5, exceeded)\n`manager.request_allowed('user1', 10)` -\u003e `True` (new window, count: 1)\n`manager.request_allowed('user1', 11)` -\u003e `True` (count: 2)",
+      "stub": null
+    },
+    {
+      "partNumber": 3,
+      "statement": "**Part 3: Concurrency and Thread Safety**\nDiscuss the challenges of implementing the `SessionManager` with `request_allowed` in a multi-threaded, concurrent environment (e.g., a web server handling many requests simultaneously). Without proper synchronization, race conditions could lead to incorrect throttling decisions. Choose one of the programming languages you're comfortable with and modify the `SessionManager` to make its methods (especially `login`, `logout`, `request_allowed`) thread-safe using appropriate synchronization primitives (e.g., locks, mutexes, semaphores). Assume that `current_time_epoch_seconds` is provided externally and correctly.",
+      "stub": null
+    }
+  ]
+}

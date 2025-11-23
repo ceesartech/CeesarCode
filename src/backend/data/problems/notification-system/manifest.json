@@ -1,0 +1,12 @@
+{
+  "ID": "notification-system",
+  "Title": "Notification System",
+  "Statement": "Design a real-time notification system",
+  "Languages": [
+    "python"
+  ],
+  "Stub": {
+    "python": ""
+  },
+  "Type": "system_design"
+}
