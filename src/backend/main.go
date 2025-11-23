@@ -22,11 +22,10 @@ import (
 	"google.golang.org/api/option"
 )
 
-type ProblemPart struct {
-	PartNumber int               `json:"partNumber"`
-	Statement  string            `json:"statement"`
-	Languages  []string          `json:"languages"`
-	Stub       map[string]string `json:"stub"`
+type Part struct {
+	PartNumber int               `json:"partNumber"` // 1, 2, 3, etc.
+	Statement  string            `json:"statement"`  // Part-specific statement
+	Stub       map[string]string `json:"stub"`       // Part-specific code stubs (optional, defaults to main stub)
 }
 
 type Problem struct {
@@ -36,9 +35,9 @@ type Problem struct {
 	Languages   []string          `json:"Languages"`
 	Stub        map[string]string `json:"Stub"`
 	Type        string            `json:"Type,omitempty"`        // "coding" or "system_design"
-	DrawingData string            `json:"DrawingData,omitempty"`  // Excalidraw drawing data (JSON string)
+	DrawingData string            `json:"DrawingData,omitempty"` // Excalidraw drawing data (JSON string)
 	IsMultiPart bool              `json:"IsMultiPart,omitempty"` // Whether this is a multi-part question
-	Parts       []ProblemPart     `json:"Parts,omitempty"`       // Array of parts for multi-part questions
+	Parts       []Part            `json:"Parts,omitempty"`       // Additional parts (Part 2, 3, etc.) - Part 1 uses Statement field
 }
 
 type TestCase struct {
@@ -46,10 +45,9 @@ type TestCase struct {
 	Output string
 }
 type SubmitReq struct {
-	ProblemID  string            `json:"ProblemID"`
-	Language   string            `json:"Language"`
-	Files      map[string]string `json:"Files"`
-	PartNumber int               `json:"PartNumber,omitempty"` // 0 for main/part 1, 1+ for additional parts
+	ProblemID, Language string
+	Files               map[string]string
+	PartNumber          int `json:"PartNumber,omitempty"` // 0 for single-part or part 1, 1+ for additional parts
 }
 type ExecJob struct {
 	SubmissionID  string `json:"submission_id"`
@@ -59,18 +57,18 @@ type ExecJob struct {
 }
 
 type AgentRequest struct {
-	Company           string `json:"company"`
-	Role              string `json:"role"`
-	Level             string `json:"level"`
-	Count             int    `json:"count,omitempty"`
-	JobDescription    string `json:"jobDescription,omitempty"`
+	Company            string `json:"company"`
+	Role               string `json:"role"`
+	Level              string `json:"level"`
+	Count              int    `json:"count,omitempty"`
+	JobDescription     string `json:"jobDescription,omitempty"`
 	CompanyDescription string `json:"companyDescription,omitempty"`
-	InterviewType     string `json:"interviewType,omitempty"`
-	Provider          string `json:"provider,omitempty"`  // "gemini", "openai", "claude"
-	APIKey            string `json:"apiKey,omitempty"`     // API key from frontend
-	DefaultLanguage   string `json:"defaultLanguage,omitempty"` // Default language for generated questions (e.g., "python", "javascript", "java")
-	QuestionType      string `json:"questionType,omitempty"`   // "coding" or "system_design"
-	IncludeMultiPart  bool   `json:"includeMultiPart,omitempty"` // Whether to include multi-part questions
+	InterviewType      string `json:"interviewType,omitempty"`
+	Provider           string `json:"provider,omitempty"`         // "gemini", "openai", "claude"
+	APIKey             string `json:"apiKey,omitempty"`           // API key from frontend
+	DefaultLanguage    string `json:"defaultLanguage,omitempty"`  // Default language for generated questions (e.g., "python", "javascript", "java")
+	QuestionType       string `json:"questionType,omitempty"`     // "coding" or "system_design"
+	IncludeMultiPart   bool   `json:"includeMultiPart,omitempty"` // Whether to generate multi-part questions
 }
 
 type AgentResponse struct {
@@ -79,7 +77,7 @@ type AgentResponse struct {
 	Message  string    `json:"message,omitempty"`
 }
 
-var dataDir = "../../dist/data/problems"
+var dataDir = "./data/problems"
 var distDir = "./"
 
 func main() {
@@ -157,9 +155,9 @@ func handleProblemsRoutes(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid path", http.StatusBadRequest)
 		return
 	}
-	
+
 	parts := strings.Split(path, "/")
-	
+
 	// Filter out empty parts
 	var cleanParts []string
 	for _, p := range parts {
@@ -239,7 +237,7 @@ func deleteProblem(w http.ResponseWriter, r *http.Request, problemID string) {
 	log.Printf("Attempting to delete problem: %s", problemID)
 	problemPath := filepath.Join(dataDir, problemID)
 	log.Printf("Problem path: %s", problemPath)
-	
+
 	// Check if problem exists
 	if _, err := os.Stat(problemPath); os.IsNotExist(err) {
 		log.Printf("Problem not found: %s", problemID)
@@ -335,27 +333,21 @@ func submit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Printf("Decoded request: %+v", req)
-	
-	// Load problem to check if it's multi-part
-	p := loadProblem(req.ProblemID)
-	if p.ID == "" {
-		http.Error(w, "problem not found", 404)
-		return
+
+	// Determine test case directory based on part number
+	pdir := filepath.Join(dataDir, req.ProblemID, "v1")
+	if req.PartNumber > 0 {
+		// For multi-part questions, use part-specific directory (part1, part2, etc.)
+		pdir = filepath.Join(dataDir, req.ProblemID, "v1", fmt.Sprintf("part%d", req.PartNumber+1))
 	}
-	
-	// Determine the problem directory based on part number
-	var pdir string
-	if p.IsMultiPart && req.PartNumber > 0 && req.PartNumber <= len(p.Parts) {
-		// For multi-part questions, use the specific part directory
-		pdir = filepath.Join(dataDir, req.ProblemID, "v1", fmt.Sprintf("part%d", req.PartNumber))
-	} else {
-		// For single-part or main part, use the standard directory
-		pdir = filepath.Join(dataDir, req.ProblemID, "v1")
-	}
-	
+
 	if _, err := os.Stat(pdir); err != nil {
-		http.Error(w, "problem not found", 404)
-		return
+		// If part-specific directory doesn't exist, fall back to public directory
+		pdir = filepath.Join(dataDir, req.ProblemID, "v1")
+		if _, err := os.Stat(pdir); err != nil {
+			http.Error(w, "problem not found", 404)
+			return
+		}
 	}
 	subID := uuid.NewString()
 	sdir := filepath.Join(os.TempDir(), "ceesarcode-submissions", subID)
@@ -936,44 +928,47 @@ func createProblem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create test files for main problem or parts
+	// Create basic test files
+	publicDir := filepath.Join(v1Dir, "public")
+	if err := os.MkdirAll(publicDir, 0755); err != nil {
+		log.Printf("Failed to create public directory: %v", err)
+		http.Error(w, "Internal server error", 500)
+		return
+	}
+
+	// Create sample input and output files for the main part (Part 1)
+	inputFile := filepath.Join(publicDir, "01.in")
+	outputFile := filepath.Join(publicDir, "01.out")
+
+	if err := os.WriteFile(inputFile, []byte(""), 0644); err != nil {
+		log.Printf("Failed to create input file: %v", err)
+	}
+
+	if err := os.WriteFile(outputFile, []byte("Hello, World!"), 0644); err != nil {
+		log.Printf("Failed to create output file: %v", err)
+	}
+
+	// If multi-part, create test directories for each part
 	if req.IsMultiPart && len(req.Parts) > 0 {
-		// Create test directories for each part
-		for i, part := range req.Parts {
-			partDir := filepath.Join(v1Dir, fmt.Sprintf("part%d", i+1), "public")
-			if err := os.MkdirAll(partDir, 0755); err != nil {
-				log.Printf("Failed to create part %d directory: %v", i+1, err)
+		for _, part := range req.Parts {
+			partDir := filepath.Join(v1Dir, fmt.Sprintf("part%d", part.PartNumber))
+			partPublicDir := filepath.Join(partDir, "public")
+			if err := os.MkdirAll(partPublicDir, 0755); err != nil {
+				log.Printf("Failed to create part%d directory: %v", part.PartNumber, err)
 				continue
 			}
-			// Create sample input and output files for this part
-			inputFile := filepath.Join(partDir, "01.in")
-			outputFile := filepath.Join(partDir, "01.out")
-			if err := os.WriteFile(inputFile, []byte(""), 0644); err != nil {
-				log.Printf("Failed to create input file for part %d: %v", i+1, err)
+
+			// Create sample test files for this part
+			partInputFile := filepath.Join(partPublicDir, "01.in")
+			partOutputFile := filepath.Join(partPublicDir, "01.out")
+
+			if err := os.WriteFile(partInputFile, []byte(""), 0644); err != nil {
+				log.Printf("Failed to create part%d input file: %v", part.PartNumber, err)
 			}
-			if err := os.WriteFile(outputFile, []byte(""), 0644); err != nil {
-				log.Printf("Failed to create output file for part %d: %v", i+1, err)
+
+			if err := os.WriteFile(partOutputFile, []byte(""), 0644); err != nil {
+				log.Printf("Failed to create part%d output file: %v", part.PartNumber, err)
 			}
-		}
-	} else {
-		// Create basic test files for single-part question
-		publicDir := filepath.Join(v1Dir, "public")
-		if err := os.MkdirAll(publicDir, 0755); err != nil {
-			log.Printf("Failed to create public directory: %v", err)
-			http.Error(w, "Internal server error", 500)
-			return
-		}
-
-		// Create sample input and output files
-		inputFile := filepath.Join(publicDir, "01.in")
-		outputFile := filepath.Join(publicDir, "01.out")
-
-		if err := os.WriteFile(inputFile, []byte(""), 0644); err != nil {
-			log.Printf("Failed to create input file: %v", err)
-		}
-
-		if err := os.WriteFile(outputFile, []byte("Hello, World!"), 0644); err != nil {
-			log.Printf("Failed to create output file: %v", err)
 		}
 	}
 
@@ -1348,7 +1343,7 @@ func generateQuestions(w http.ResponseWriter, r *http.Request) {
 		req.Count = 3
 	}
 
-	log.Printf("Agent request: Company=%s, Role=%s, Level=%s, Count=%d, Provider=%s, QuestionType=%s, HasAPIKey=%v", 
+	log.Printf("Agent request: Company=%s, Role=%s, Level=%s, Count=%d, Provider=%s, QuestionType=%s, HasAPIKey=%v",
 		req.Company, req.Role, req.Level, req.Count, req.Provider, req.QuestionType, req.APIKey != "")
 	log.Printf("Starting question generation process...")
 
@@ -1357,7 +1352,7 @@ func generateQuestions(w http.ResponseWriter, r *http.Request) {
 	problems, err := callAgentAPI(req)
 	duration := time.Since(startTime)
 	log.Printf("Question generation completed in %v", duration)
-	
+
 	if err != nil {
 		log.Printf("Agent API error after %v: %v", duration, err)
 		// Return error to user instead of silently falling back
@@ -1370,7 +1365,7 @@ func generateQuestions(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(response)
 		return
 	}
-	
+
 	log.Printf("Successfully generated %d problems", len(problems))
 
 	// Save generated problems to the data directory
@@ -1407,11 +1402,11 @@ func searchWebForPosition(company, role, level string) string {
 		// Most important: Interview questions and patterns
 		fmt.Sprintf("%s %s %s coding interview questions", company, level, role),
 		fmt.Sprintf("%s %s %s technical interview questions", company, level, role),
-		
+
 		// Technical requirements and skills
 		fmt.Sprintf("%s %s %s job requirements skills technologies", company, level, role),
 		fmt.Sprintf("%s %s technical stack programming languages", company, role),
-		
+
 		// Company-specific interview information
 		fmt.Sprintf("%s interview experience %s %s", company, level, role),
 		fmt.Sprintf("%s %s technologies frameworks tools", company, role),
@@ -1423,7 +1418,7 @@ func searchWebForPosition(company, role, level string) string {
 		info  string
 	}
 	resultChan := make(chan searchResult, len(searchQueries))
-	
+
 	// Launch concurrent searches
 	for _, query := range searchQueries {
 		go func(q string) {
@@ -1438,7 +1433,7 @@ func searchWebForPosition(company, role, level string) string {
 
 	var allResults []string
 	completed := 0
-	
+
 	for completed < len(searchQueries) {
 		select {
 		case result := <-resultChan:
@@ -1462,7 +1457,7 @@ func searchWebForPosition(company, role, level string) string {
 
 	// Combine and deduplicate all results
 	combinedInfo := combineSearchResults(allResults, company, role, level)
-	
+
 	// Increase limit to 8000 chars for comprehensive information
 	if len(combinedInfo) > 8000 {
 		combinedInfo = combinedInfo[:8000] + "..."
@@ -1522,7 +1517,7 @@ func combineSearchResults(results []string, company, role, level string) string 
 
 	var combined strings.Builder
 	seenSnippets := make(map[string]bool)
-	
+
 	// Organize information by category
 	var interviewQuestions []string
 	var technicalRequirements []string
@@ -1542,10 +1537,10 @@ func combineSearchResults(results []string, company, role, level string) string 
 		}
 
 		resultLower := strings.ToLower(result)
-		
+
 		// Categorize the result
 		categorized := false
-		
+
 		// Check for interview questions
 		for _, keyword := range interviewKeywords {
 			if strings.Contains(resultLower, keyword) {
@@ -1557,7 +1552,7 @@ func combineSearchResults(results []string, company, role, level string) string 
 				}
 			}
 		}
-		
+
 		if !categorized {
 			// Check for technologies
 			for _, keyword := range techKeywords {
@@ -1571,7 +1566,7 @@ func combineSearchResults(results []string, company, role, level string) string 
 				}
 			}
 		}
-		
+
 		if !categorized {
 			// Check for requirements
 			for _, keyword := range requirementKeywords {
@@ -1585,7 +1580,7 @@ func combineSearchResults(results []string, company, role, level string) string 
 				}
 			}
 		}
-		
+
 		if !categorized {
 			// Check for interview process
 			for _, keyword := range processKeywords {
@@ -1599,7 +1594,7 @@ func combineSearchResults(results []string, company, role, level string) string 
 				}
 			}
 		}
-		
+
 		// If not categorized, add to general info
 		if !categorized && !seenSnippets[result] {
 			generalInfo = append(generalInfo, result)
@@ -1609,7 +1604,7 @@ func combineSearchResults(results []string, company, role, level string) string 
 
 	// Build comprehensive report
 	combined.WriteString(fmt.Sprintf("COMPREHENSIVE RESEARCH FINDINGS FOR %s %s POSITION AT %s\n\n", strings.ToUpper(level), strings.ToUpper(role), strings.ToUpper(company)))
-	
+
 	if len(interviewQuestions) > 0 {
 		combined.WriteString("=== INTERVIEW QUESTIONS & CODING CHALLENGES ===\n")
 		for i, info := range interviewQuestions {
@@ -1619,7 +1614,7 @@ func combineSearchResults(results []string, company, role, level string) string 
 		}
 		combined.WriteString("\n")
 	}
-	
+
 	if len(technicalRequirements) > 0 {
 		combined.WriteString("=== TECHNICAL REQUIREMENTS & SKILLS ===\n")
 		for i, info := range technicalRequirements {
@@ -1629,7 +1624,7 @@ func combineSearchResults(results []string, company, role, level string) string 
 		}
 		combined.WriteString("\n")
 	}
-	
+
 	if len(technologies) > 0 {
 		combined.WriteString("=== TECHNOLOGIES, FRAMEWORKS & TOOLS ===\n")
 		for i, info := range technologies {
@@ -1639,7 +1634,7 @@ func combineSearchResults(results []string, company, role, level string) string 
 		}
 		combined.WriteString("\n")
 	}
-	
+
 	if len(interviewProcess) > 0 {
 		combined.WriteString("=== INTERVIEW PROCESS & FORMAT ===\n")
 		for i, info := range interviewProcess {
@@ -1649,7 +1644,7 @@ func combineSearchResults(results []string, company, role, level string) string 
 		}
 		combined.WriteString("\n")
 	}
-	
+
 	if len(generalInfo) > 0 {
 		combined.WriteString("=== ADDITIONAL RELEVANT INFORMATION ===\n")
 		for i, info := range generalInfo {
@@ -1667,7 +1662,7 @@ func truncateText(text string, maxLen int) string {
 	if len(text) <= maxLen {
 		return text
 	}
-	
+
 	truncated := text[:maxLen]
 	// Try to find the last space or period to end at a word boundary
 	if lastSpace := strings.LastIndex(truncated, " "); lastSpace > maxLen*3/4 {
@@ -1683,28 +1678,28 @@ func truncateText(text string, maxLen int) string {
 // extractInfoFromHTML extracts comprehensive relevant information from HTML search results
 func extractInfoFromHTML(html, company, role, level string) string {
 	var info strings.Builder
-	
+
 	// Remove HTML tags and extract text content
 	re := regexp.MustCompile(`<[^>]*>`)
 	text := re.ReplaceAllString(html, " ")
-	
+
 	// Remove script and style content
 	re = regexp.MustCompile(`(?i)<script[^>]*>.*?</script>`)
 	text = re.ReplaceAllString(text, " ")
 	re = regexp.MustCompile(`(?i)<style[^>]*>.*?</style>`)
 	text = re.ReplaceAllString(text, " ")
-	
+
 	// Clean up whitespace and special characters
 	re = regexp.MustCompile(`\s+`)
 	text = re.ReplaceAllString(text, " ")
 	re = regexp.MustCompile(`[^\w\s\.\,\!\?\:\;\-\(\)\[\]\/]`)
 	text = re.ReplaceAllString(text, " ")
 	text = strings.TrimSpace(text)
-	
+
 	if len(text) == 0 {
 		return ""
 	}
-	
+
 	// Expanded keywords for comprehensive extraction
 	keywords := []string{
 		strings.ToLower(company),
@@ -1747,12 +1742,12 @@ func extractInfoFromHTML(html, company, role, level string) string {
 		"complexity",
 		"optimization",
 	}
-	
+
 	// Find all relevant snippets with context
 	textLower := strings.ToLower(text)
 	seenSnippets := make(map[string]bool)
 	var relevantSnippets []string
-	
+
 	// Extract snippets around each keyword occurrence
 	for _, keyword := range keywords {
 		startPos := 0
@@ -1762,7 +1757,7 @@ func extractInfoFromHTML(html, company, role, level string) string {
 				break
 			}
 			actualIdx := startPos + idx
-			
+
 			// Extract larger context around the keyword (300 chars before, 700 chars after)
 			start := actualIdx - 300
 			if start < 0 {
@@ -1772,23 +1767,23 @@ func extractInfoFromHTML(html, company, role, level string) string {
 			if end > len(text) {
 				end = len(text)
 			}
-			
+
 			// Extract snippet
 			snippet := text[start:end]
 			snippet = strings.TrimSpace(snippet)
-			
+
 			// Clean up snippet - remove very short or very repetitive snippets
 			if len(snippet) > 50 && len(snippet) < 2000 {
 				// Create a normalized version for deduplication (remove case and extra spaces)
 				normalized := strings.ToLower(snippet)
 				normalized = regexp.MustCompile(`\s+`).ReplaceAllString(normalized, " ")
-				
+
 				if !seenSnippets[normalized] {
 					seenSnippets[normalized] = true
 					relevantSnippets = append(relevantSnippets, snippet)
 				}
 			}
-			
+
 			// Move past this occurrence
 			startPos = actualIdx + len(keyword)
 			if startPos >= len(text) {
@@ -1796,7 +1791,7 @@ func extractInfoFromHTML(html, company, role, level string) string {
 			}
 		}
 	}
-	
+
 	// If we found relevant snippets, use them
 	if len(relevantSnippets) > 0 {
 		// Sort by length (prefer longer, more detailed snippets) and take the best ones
@@ -1819,7 +1814,7 @@ func extractInfoFromHTML(html, company, role, level string) string {
 			}
 			relevantSnippets = selected
 		}
-		
+
 		// Combine snippets
 		for i, snippet := range relevantSnippets {
 			if i > 0 {
@@ -1835,7 +1830,7 @@ func extractInfoFromHTML(html, company, role, level string) string {
 		// Try to find sentences or paragraphs
 		sentences := regexp.MustCompile(`[.!?]\s+`).Split(text, -1)
 		var meaningfulSentences []string
-		
+
 		for _, sentence := range sentences {
 			sentence = strings.TrimSpace(sentence)
 			if len(sentence) > 30 && len(sentence) < 500 {
@@ -1849,7 +1844,7 @@ func extractInfoFromHTML(html, company, role, level string) string {
 				}
 			}
 		}
-		
+
 		if len(meaningfulSentences) > 0 {
 			maxSentences := 10
 			if len(meaningfulSentences) > maxSentences {
@@ -1867,14 +1862,14 @@ func extractInfoFromHTML(html, company, role, level string) string {
 			}
 		}
 	}
-	
+
 	result := info.String()
 	// Final cleanup
 	result = strings.TrimSpace(result)
 	if len(result) == 0 {
 		return ""
 	}
-	
+
 	return result
 }
 
@@ -1885,14 +1880,14 @@ func callAgentAPI(req AgentRequest) ([]Problem, error) {
 		provider = "gemini" // Default to Gemini
 	}
 	log.Printf("callAgentAPI: provider=%s, hasRequestAPIKey=%v", provider, req.APIKey != "")
-	
+
 	// Perform comprehensive web search for position information to enhance prompts
 	webSearchStart := time.Now()
 	log.Printf("Performing comprehensive web search for %s %s position at %s...", req.Level, req.Role, req.Company)
 	webSearchInfo := searchWebForPosition(req.Company, req.Role, req.Level)
 	webSearchDuration := time.Since(webSearchStart)
 	log.Printf("Web search completed in %v", webSearchDuration)
-	
+
 	if webSearchInfo != "" {
 		log.Printf("Comprehensive web search completed successfully (length: %d chars)", len(webSearchInfo))
 		// Enhance the request with comprehensive web search information
@@ -1904,7 +1899,7 @@ func callAgentAPI(req AgentRequest) ([]Problem, error) {
 	} else {
 		log.Printf("Web search did not return additional information")
 	}
-	
+
 	var apiKey string
 	if req.APIKey != "" {
 		// Use API key from request (frontend)
@@ -1983,14 +1978,14 @@ func getLanguageConfig(defaultLang string) ([]string, map[string]string) {
 	if defaultLang == "" {
 		defaultLang = "python"
 	}
-	
+
 	// Common languages to include
 	allLanguages := []string{"python", "java", "cpp", "javascript", "go", "rust"}
-	
+
 	// Create language list with default first
 	languages := []string{defaultLang}
 	seen := map[string]bool{defaultLang: true}
-	
+
 	// Add other common languages
 	for _, lang := range allLanguages {
 		if !seen[lang] {
@@ -1998,7 +1993,7 @@ func getLanguageConfig(defaultLang string) ([]string, map[string]string) {
 			seen[lang] = true
 		}
 	}
-	
+
 	// Stub templates for each language
 	stubs := map[string]string{
 		"python":     "def solution():\n    # Your code here\n    pass",
@@ -2008,12 +2003,12 @@ func getLanguageConfig(defaultLang string) ([]string, map[string]string) {
 		"go":         "func solution() {\n    // Your code here\n}",
 		"rust":       "fn solution() {\n    // Your code here\n}",
 	}
-	
+
 	// If default language doesn't have a stub, use a generic one
 	if _, exists := stubs[defaultLang]; !exists {
 		stubs[defaultLang] = "// Your code here\n"
 	}
-	
+
 	return languages, stubs
 }
 
@@ -2072,13 +2067,13 @@ func generateAIGuestions(req AgentRequest, apiKey string) ([]Problem, error) {
 			interviewContext += fmt.Sprintf("\n\nCompany Information:\n%s\n- Consider this company context when generating questions.", req.CompanyDescription)
 		}
 	}
-	
+
 	// Determine question type
 	questionType := req.QuestionType
 	if questionType == "" {
 		questionType = "coding" // Default to coding
 	}
-	
+
 	var prompt string
 	if questionType == "system_design" {
 		// System design question prompt
@@ -2121,61 +2116,36 @@ IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no 
 		languages, stubs := getLanguageConfig(defaultLang)
 		languageList := fmt.Sprintf(`["%s"]`, strings.Join(languages, `", "`))
 		stubTemplates := formatLanguageStubs(languages, stubs)
-		
-		multiPartSection := ""
+
+		// Determine if multi-part questions should be included
+		multiPartInstruction := ""
+		multiPartFormat := ""
 		if req.IncludeMultiPart {
-			multiPartSection = fmt.Sprintf(`
+			multiPartInstruction = `
+- Some questions (30-40%% of them) should be multi-part questions with 2-3 follow-up parts
+- For multi-part questions, Part 1 should be a standalone problem, Part 2 builds on Part 1, Part 3 builds on Parts 1 and 2
+- Each follow-up part should increase in complexity and extend the initial problem
+- Follow-up parts should test different aspects or optimizations of the core problem`
 
-═══════════════════════════════════════════════════════════════
-CRITICAL: MULTI-PART QUESTIONS REQUIRED
-═══════════════════════════════════════════════════════════════
+			multiPartFormat = `
 
-You MUST generate multi-part questions! Approximately 30-40%% of the questions should be multi-part questions with follow-ups.
-
-For multi-part questions, use this EXACT format:
-{
-  "id": "unique-kebab-case-id",
-  "title": "Descriptive Title",
-  "statement": "Initial problem description (Part 1 - must be solvable independently)",
-  "type": "coding",
-  "isMultiPart": true,
-  "languages": %s,
-  "stub": {
-%s  },
-  "parts": [
-    {
-      "partNumber": 1,
-      "statement": "Follow-up question that builds on Part 1. Reference the solution from Part 1.",
-      "languages": %s,
-      "stub": {
-%s      }
-    },
-    {
-      "partNumber": 2,
-      "statement": "Another follow-up that builds on Parts 1 and 2. Reference previous solutions.",
-      "languages": %s,
-      "stub": {
-%s      }
-    }
-  ]
-}
-
-IMPORTANT RULES FOR MULTI-PART QUESTIONS:
-1. The main "statement" field is Part 1 - it must be a complete, standalone problem
-2. Each part in the "parts" array is a follow-up (Part 2, Part 3, etc.)
-3. Each part should progressively build on previous parts
-4. Each part must have its own "statement" and "stub" code
-5. Parts should reference or extend solutions from previous parts
-6. You can have 2-4 parts per multi-part question
-
-For single-part questions (the remaining 60-70%%), use the standard format without "isMultiPart" or "parts" fields.
-
-═══════════════════════════════════════════════════════════════`, languageList, stubTemplates, languageList, stubTemplates, languageList, stubTemplates)
+For multi-part questions, add:
+    "isMultiPart": true,
+    "parts": [
+      {
+        "partNumber": 2,
+        "statement": "Part 2: [Building on Part 1, add this requirement...]"
+      },
+      {
+        "partNumber": 3,
+        "statement": "Part 3: [Building on Parts 1 and 2, now optimize for...]"
+      }
+    ]`
 		}
-		
+
 		prompt = fmt.Sprintf(`You are a coding interview question generator. Generate exactly %d unique coding interview questions for a %s %s position at %s.%s
 
-CRITICAL: You MUST return ONLY valid JSON. No markdown, no explanations, no code blocks - just pure JSON.%s
+CRITICAL: You MUST return ONLY valid JSON. No markdown, no explanations, no code blocks - just pure JSON.
 
 Requirements:
 - Questions should be appropriate for %s level
@@ -2183,14 +2153,14 @@ Requirements:
 - Include a mix of algorithmic, data structure, and practical problems
 - Each question should have a clear problem statement with examples
 - Include sample input/output examples
-- Provide starter code stubs for %s (with %s as the primary/default language)
+- Provide starter code stubs for %s (with %s as the primary/default language)%s
 
 For %s level %s roles at %s, consider:
 - %s-specific challenges and scenarios
 - Technologies commonly used in %s development
 - Problem complexity appropriate for %s level
 
-Return ONLY a JSON array (no markdown, no code blocks, no explanations). Use the format shown above for multi-part questions, or this format for single-part questions:
+Return ONLY a JSON array (no markdown, no code blocks, no explanations) with this exact format:
 [
   {
     "id": "unique-kebab-case-id",
@@ -2199,12 +2169,12 @@ Return ONLY a JSON array (no markdown, no code blocks, no explanations). Use the
     "type": "coding",
     "languages": %s,
     "stub": {
-%s    }
+%s    }%s
   }
 ]
 
 IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no code blocks, no explanations.`,
-			req.Count, req.Level, req.Role, req.Company, interviewContext, multiPartSection, req.Level, req.Role, strings.Join(languages, ", "), defaultLang, req.Level, req.Role, req.Company, req.Role, req.Role, req.Level, languageList, stubTemplates)
+			req.Count, req.Level, req.Role, req.Company, interviewContext, req.Level, req.Role, strings.Join(languages, ", "), defaultLang, multiPartInstruction, req.Level, req.Role, req.Company, req.Role, req.Role, req.Level, languageList, stubTemplates, multiPartFormat)
 	}
 
 	// Retry logic for rate limiting with exponential backoff
@@ -2348,8 +2318,6 @@ IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no 
 		Stub        map[string]string `json:"stub"`
 		Type        string            `json:"type,omitempty"`
 		DrawingData string            `json:"drawingData,omitempty"`
-		IsMultiPart bool              `json:"isMultiPart,omitempty"`
-		Parts       []ProblemPart     `json:"parts,omitempty"`
 	}
 
 	if err := json.Unmarshal([]byte(cleanText), &aiProblems); err != nil {
@@ -2403,8 +2371,6 @@ IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no 
 			Stub:        aiProblem.Stub,
 			Type:        problemType,
 			DrawingData: aiProblem.DrawingData,
-			IsMultiPart: aiProblem.IsMultiPart,
-			Parts:       aiProblem.Parts,
 		}
 	}
 
@@ -2414,7 +2380,7 @@ IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no 
 
 func generateOpenAIQuestions(req AgentRequest, apiKey string) ([]Problem, error) {
 	ctx := context.Background()
-	
+
 	// Create prompt
 	interviewContext := ""
 	if req.InterviewType != "" {
@@ -2431,13 +2397,13 @@ func generateOpenAIQuestions(req AgentRequest, apiKey string) ([]Problem, error)
 			interviewContext += fmt.Sprintf("\n\nCompany Information:\n%s\n- Consider this company context when generating questions.", req.CompanyDescription)
 		}
 	}
-	
+
 	// Determine question type
 	questionType := req.QuestionType
 	if questionType == "" {
 		questionType = "coding" // Default to coding
 	}
-	
+
 	var prompt string
 	if questionType == "system_design" {
 		// System design question prompt
@@ -2480,61 +2446,36 @@ IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no 
 		languages, stubs := getLanguageConfig(defaultLang)
 		languageList := fmt.Sprintf(`["%s"]`, strings.Join(languages, `", "`))
 		stubTemplates := formatLanguageStubs(languages, stubs)
-		
-		multiPartSection := ""
+
+		// Determine if multi-part questions should be included
+		multiPartInstruction := ""
+		multiPartFormat := ""
 		if req.IncludeMultiPart {
-			multiPartSection = fmt.Sprintf(`
+			multiPartInstruction = `
+- Some questions (30-40%% of them) should be multi-part questions with 2-3 follow-up parts
+- For multi-part questions, Part 1 should be a standalone problem, Part 2 builds on Part 1, Part 3 builds on Parts 1 and 2
+- Each follow-up part should increase in complexity and extend the initial problem
+- Follow-up parts should test different aspects or optimizations of the core problem`
 
-═══════════════════════════════════════════════════════════════
-CRITICAL: MULTI-PART QUESTIONS REQUIRED
-═══════════════════════════════════════════════════════════════
+			multiPartFormat = `
 
-You MUST generate multi-part questions! Approximately 30-40%% of the questions should be multi-part questions with follow-ups.
-
-For multi-part questions, use this EXACT format:
-{
-  "id": "unique-kebab-case-id",
-  "title": "Descriptive Title",
-  "statement": "Initial problem description (Part 1 - must be solvable independently)",
-  "type": "coding",
-  "isMultiPart": true,
-  "languages": %s,
-  "stub": {
-%s  },
-  "parts": [
-    {
-      "partNumber": 1,
-      "statement": "Follow-up question that builds on Part 1. Reference the solution from Part 1.",
-      "languages": %s,
-      "stub": {
-%s      }
-    },
-    {
-      "partNumber": 2,
-      "statement": "Another follow-up that builds on Parts 1 and 2. Reference previous solutions.",
-      "languages": %s,
-      "stub": {
-%s      }
-    }
-  ]
-}
-
-IMPORTANT RULES FOR MULTI-PART QUESTIONS:
-1. The main "statement" field is Part 1 - it must be a complete, standalone problem
-2. Each part in the "parts" array is a follow-up (Part 2, Part 3, etc.)
-3. Each part should progressively build on previous parts
-4. Each part must have its own "statement" and "stub" code
-5. Parts should reference or extend solutions from previous parts
-6. You can have 2-4 parts per multi-part question
-
-For single-part questions (the remaining 60-70%%), use the standard format without "isMultiPart" or "parts" fields.
-
-═══════════════════════════════════════════════════════════════`, languageList, stubTemplates, languageList, stubTemplates, languageList, stubTemplates)
+For multi-part questions, add:
+    "isMultiPart": true,
+    "parts": [
+      {
+        "partNumber": 2,
+        "statement": "Part 2: [Building on Part 1, add this requirement...]"
+      },
+      {
+        "partNumber": 3,
+        "statement": "Part 3: [Building on Parts 1 and 2, now optimize for...]"
+      }
+    ]`
 		}
-		
+
 		prompt = fmt.Sprintf(`You are a coding interview question generator. Generate exactly %d unique coding interview questions for a %s %s position at %s.%s
 
-CRITICAL: You MUST return ONLY valid JSON. No markdown, no explanations, no code blocks - just pure JSON.%s
+CRITICAL: You MUST return ONLY valid JSON. No markdown, no explanations, no code blocks - just pure JSON.
 
 Requirements:
 - Questions should be appropriate for %s level
@@ -2542,14 +2483,9 @@ Requirements:
 - Include a mix of algorithmic, data structure, and practical problems
 - Each question should have a clear problem statement with examples
 - Include sample input/output examples
-- Provide starter code stubs for %s (with %s as the primary/default language)
+- Provide starter code stubs for %s (with %s as the primary/default language)%s
 
-For %s level %s roles at %s, consider:
-- %s-specific challenges and scenarios
-- Technologies commonly used in %s development
-- Problem complexity appropriate for %s level
-
-Return ONLY a JSON array (no markdown, no code blocks, no explanations). Use the format shown above for multi-part questions, or this format for single-part questions:
+Return ONLY a JSON array (no markdown, no code blocks, no explanations) with this exact format:
 [
   {
     "id": "unique-kebab-case-id",
@@ -2558,12 +2494,12 @@ Return ONLY a JSON array (no markdown, no code blocks, no explanations). Use the
     "type": "coding",
     "languages": %s,
     "stub": {
-%s    }
+%s    }%s
   }
 ]
 
 IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no code blocks, no explanations.`,
-			req.Count, req.Level, req.Role, req.Company, interviewContext, multiPartSection, req.Level, req.Role, strings.Join(languages, ", "), defaultLang, req.Level, req.Role, req.Company, req.Role, req.Role, req.Level, languageList, stubTemplates)
+			req.Count, req.Level, req.Role, req.Company, interviewContext, req.Level, req.Role, strings.Join(languages, ", "), defaultLang, multiPartInstruction, languageList, stubTemplates, multiPartFormat)
 	}
 
 	// Prepare request
@@ -2650,7 +2586,7 @@ IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no 
 
 func generateClaudeQuestions(req AgentRequest, apiKey string) ([]Problem, error) {
 	ctx := context.Background()
-	
+
 	// Create prompt
 	interviewContext := ""
 	if req.InterviewType != "" {
@@ -2667,13 +2603,13 @@ func generateClaudeQuestions(req AgentRequest, apiKey string) ([]Problem, error)
 			interviewContext += fmt.Sprintf("\n\nCompany Information:\n%s\n- Consider this company context when generating questions.", req.CompanyDescription)
 		}
 	}
-	
+
 	// Determine question type
 	questionType := req.QuestionType
 	if questionType == "" {
 		questionType = "coding" // Default to coding
 	}
-	
+
 	var prompt string
 	if questionType == "system_design" {
 		// System design question prompt
@@ -2716,61 +2652,36 @@ IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no 
 		languages, stubs := getLanguageConfig(defaultLang)
 		languageList := fmt.Sprintf(`["%s"]`, strings.Join(languages, `", "`))
 		stubTemplates := formatLanguageStubs(languages, stubs)
-		
-		multiPartSection := ""
+
+		// Determine if multi-part questions should be included
+		multiPartInstruction := ""
+		multiPartFormat := ""
 		if req.IncludeMultiPart {
-			multiPartSection = fmt.Sprintf(`
+			multiPartInstruction = `
+- Some questions (30-40%% of them) should be multi-part questions with 2-3 follow-up parts
+- For multi-part questions, Part 1 should be a standalone problem, Part 2 builds on Part 1, Part 3 builds on Parts 1 and 2
+- Each follow-up part should increase in complexity and extend the initial problem
+- Follow-up parts should test different aspects or optimizations of the core problem`
 
-═══════════════════════════════════════════════════════════════
-CRITICAL: MULTI-PART QUESTIONS REQUIRED
-═══════════════════════════════════════════════════════════════
+			multiPartFormat = `
 
-You MUST generate multi-part questions! Approximately 30-40%% of the questions should be multi-part questions with follow-ups.
-
-For multi-part questions, use this EXACT format:
-{
-  "id": "unique-kebab-case-id",
-  "title": "Descriptive Title",
-  "statement": "Initial problem description (Part 1 - must be solvable independently)",
-  "type": "coding",
-  "isMultiPart": true,
-  "languages": %s,
-  "stub": {
-%s  },
-  "parts": [
-    {
-      "partNumber": 1,
-      "statement": "Follow-up question that builds on Part 1. Reference the solution from Part 1.",
-      "languages": %s,
-      "stub": {
-%s      }
-    },
-    {
-      "partNumber": 2,
-      "statement": "Another follow-up that builds on Parts 1 and 2. Reference previous solutions.",
-      "languages": %s,
-      "stub": {
-%s      }
-    }
-  ]
-}
-
-IMPORTANT RULES FOR MULTI-PART QUESTIONS:
-1. The main "statement" field is Part 1 - it must be a complete, standalone problem
-2. Each part in the "parts" array is a follow-up (Part 2, Part 3, etc.)
-3. Each part should progressively build on previous parts
-4. Each part must have its own "statement" and "stub" code
-5. Parts should reference or extend solutions from previous parts
-6. You can have 2-4 parts per multi-part question
-
-For single-part questions (the remaining 60-70%%), use the standard format without "isMultiPart" or "parts" fields.
-
-═══════════════════════════════════════════════════════════════`, languageList, stubTemplates, languageList, stubTemplates, languageList, stubTemplates)
+For multi-part questions, add:
+    "isMultiPart": true,
+    "parts": [
+      {
+        "partNumber": 2,
+        "statement": "Part 2: [Building on Part 1, add this requirement...]"
+      },
+      {
+        "partNumber": 3,
+        "statement": "Part 3: [Building on Parts 1 and 2, now optimize for...]"
+      }
+    ]`
 		}
-		
+
 		prompt = fmt.Sprintf(`You are a coding interview question generator. Generate exactly %d unique coding interview questions for a %s %s position at %s.%s
 
-CRITICAL: You MUST return ONLY valid JSON. No markdown, no explanations, no code blocks - just pure JSON.%s
+CRITICAL: You MUST return ONLY valid JSON. No markdown, no explanations, no code blocks - just pure JSON.
 
 Requirements:
 - Questions should be appropriate for %s level
@@ -2778,14 +2689,9 @@ Requirements:
 - Include a mix of algorithmic, data structure, and practical problems
 - Each question should have a clear problem statement with examples
 - Include sample input/output examples
-- Provide starter code stubs for %s (with %s as the primary/default language)
+- Provide starter code stubs for %s (with %s as the primary/default language)%s
 
-For %s level %s roles at %s, consider:
-- %s-specific challenges and scenarios
-- Technologies commonly used in %s development
-- Problem complexity appropriate for %s level
-
-Return ONLY a JSON array (no markdown, no code blocks, no explanations). Use the format shown above for multi-part questions, or this format for single-part questions:
+Return ONLY a JSON array (no markdown, no code blocks, no explanations) with this exact format:
 [
   {
     "id": "unique-kebab-case-id",
@@ -2794,19 +2700,19 @@ Return ONLY a JSON array (no markdown, no code blocks, no explanations). Use the
     "type": "coding",
     "languages": %s,
     "stub": {
-%s    }
+%s    }%s
   }
 ]
 
 IMPORTANT: Return ONLY the JSON array, nothing else. No markdown formatting, no code blocks, no explanations.`,
-			req.Count, req.Level, req.Role, req.Company, interviewContext, multiPartSection, req.Level, req.Role, strings.Join(languages, ", "), defaultLang, req.Level, req.Role, req.Company, req.Role, req.Role, req.Level, languageList, stubTemplates)
+			req.Count, req.Level, req.Role, req.Company, interviewContext, req.Level, req.Role, strings.Join(languages, ", "), defaultLang, multiPartInstruction, languageList, stubTemplates, multiPartFormat)
 	}
 
 	// Prepare request
 	requestBody := map[string]interface{}{
-		"model":       "claude-3-5-sonnet-20241022",
-		"max_tokens":  4000,
-		"messages":    []map[string]string{{"role": "user", "content": prompt}},
+		"model":      "claude-3-5-sonnet-20241022",
+		"max_tokens": 4000,
+		"messages":   []map[string]string{{"role": "user", "content": prompt}},
 	}
 
 	jsonData, err := json.Marshal(requestBody)
@@ -2893,8 +2799,6 @@ func parseAIResponse(responseText string, req AgentRequest) ([]Problem, error) {
 		Stub        map[string]string `json:"stub"`
 		Type        string            `json:"type,omitempty"`
 		DrawingData string            `json:"drawingData,omitempty"`
-		IsMultiPart bool              `json:"isMultiPart,omitempty"`
-		Parts       []ProblemPart     `json:"parts,omitempty"`
 	}
 
 	if err := json.Unmarshal([]byte(cleanText), &aiProblems); err != nil {
@@ -2947,8 +2851,6 @@ func parseAIResponse(responseText string, req AgentRequest) ([]Problem, error) {
 			Stub:        aiProblem.Stub,
 			Type:        problemType,
 			DrawingData: aiProblem.DrawingData,
-			IsMultiPart: aiProblem.IsMultiPart,
-			Parts:       aiProblem.Parts,
 		}
 	}
 

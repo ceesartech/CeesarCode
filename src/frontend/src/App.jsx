@@ -574,7 +574,7 @@ const getDefaultStubForLanguage = (language) => {
 function AppContent() {
   const [problems, setProblems] = useState([])
   const [selectedProblem, setSelectedProblem] = useState(null)
-  const [selectedPart, setSelectedPart] = useState(0) // 0 for main/part 1, 1+ for additional parts
+  const [selectedPart, setSelectedPart] = useState(0) // 0 for part 1, 1 for part 2, etc.
   const [selectedLanguage, setSelectedLanguage] = useState('python')
   const [code, setCode] = useState('')
   const [partCodes, setPartCodes] = useState({}) // Store code for each part: { 0: 'code1', 1: 'code2', ... }
@@ -602,7 +602,7 @@ function AppContent() {
     type: 'coding', // 'coding' or 'system_design'
     drawingData: '', // Excalidraw drawing data
     isMultiPart: false, // Whether this is a multi-part question
-    parts: [] // Array of parts for multi-part questions
+    parts: [] // Array of parts for multi-part questions (Part 2, Part 3, etc.)
   })
   const [isFullscreen, setIsFullscreen] = useState(false)
   
@@ -703,8 +703,8 @@ function AppContent() {
   const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false)
   const [agentResult, setAgentResult] = useState(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    const saved = localStorage.getItem('ceesarcode-sidebar-collapsed')
-    return saved ? JSON.parse(saved) : false
+    // Always start with sidebar visible (not collapsed)
+    return false
   })
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem('ceesarcode-sidebar-width')
@@ -1158,7 +1158,7 @@ function AppContent() {
     const parts = selectedProblem && (selectedProblem.Parts || selectedProblem.parts || [])
     
     if (isMultiPart && parts.length > 0) {
-      // Save current code
+      // Save current code before switching
       setPartCodes(prev => ({
         ...prev,
         [selectedPart]: code
@@ -1166,14 +1166,14 @@ function AppContent() {
       
       // Load code for new language
       if (selectedPart === 0) {
-        // Main part
+        // Main part (Part 1)
         if (selectedProblem.Stub && selectedProblem.Stub[newLanguage]) {
           setCode(partCodes[0] || selectedProblem.Stub[newLanguage])
         } else {
           setCode(partCodes[0] || getDefaultStubForLanguage(newLanguage))
         }
       } else {
-        // Additional part
+        // Additional part (Part 2, 3, etc.)
         const part = parts[selectedPart - 1]
         const partStub = part.stub || part.Stub || {}
         if (partStub[newLanguage]) {
@@ -1184,6 +1184,7 @@ function AppContent() {
       }
     } else {
       // Single-part question
+    // Load stub code for the new language
     if (selectedProblem && selectedProblem.Stub && selectedProblem.Stub[newLanguage]) {
       setCode(selectedProblem.Stub[newLanguage])
     } else {
@@ -1772,14 +1773,11 @@ function AppContent() {
   const handleCodeChange = (newCode) => {
     setCode(newCode || '')
     // Save to part-specific storage for multi-part questions
-    if (selectedProblem) {
-      const isMultiPart = selectedProblem.IsMultiPart || selectedProblem.isMultiPart
-      if (isMultiPart) {
-        setPartCodes(prev => ({
-          ...prev,
-          [selectedPart]: newCode || ''
-        }))
-      }
+    if (selectedProblem && (selectedProblem.IsMultiPart || selectedProblem.isMultiPart)) {
+      setPartCodes(prev => ({
+        ...prev,
+        [selectedPart]: newCode || ''
+      }))
     }
   }
 
@@ -3451,30 +3449,6 @@ function AppContent() {
         }
         return
       }
-      
-      // Escape to go back to problems list
-      if (e.key === 'Escape') {
-        if (showShortcuts) {
-          setShowShortcuts(false)
-        } else if (selectedProblem) {
-          setSelectedProblem(null)
-        }
-        return
-      }
-      
-      // Ctrl/Cmd + Shift + L to cycle language forward
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'L') {
-        e.preventDefault()
-        cycleLanguage(1)
-        return
-      }
-      
-      // Ctrl/Cmd + Shift + J to cycle language backward
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'J') {
-        e.preventDefault()
-        cycleLanguage(-1)
-        return
-      }
 
       // Ctrl/Cmd + Arrow Right to go to next part (for multi-part questions)
       if (selectedProblem && (selectedProblem.IsMultiPart || selectedProblem.isMultiPart)) {
@@ -3498,6 +3472,30 @@ function AppContent() {
             return
           }
         }
+      }
+      
+      // Escape to go back to problems list
+      if (e.key === 'Escape') {
+        if (showShortcuts) {
+          setShowShortcuts(false)
+        } else if (selectedProblem) {
+          setSelectedProblem(null)
+        }
+        return
+      }
+      
+      // Ctrl/Cmd + Shift + L to cycle language forward
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'L') {
+        e.preventDefault()
+        cycleLanguage(1)
+        return
+      }
+      
+      // Ctrl/Cmd + Shift + J to cycle language backward
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'J') {
+        e.preventDefault()
+        cycleLanguage(-1)
+        return
       }
       
       // Ctrl/Cmd + Shift + D to toggle dark mode
@@ -3587,11 +3585,13 @@ function AppContent() {
         const firstLanguage = problem.Languages && problem.Languages[0] ? problem.Languages[0] : 'python'
         setSelectedLanguage(firstLanguage)
 
-        // Load stub code for the selected language (main part)
+        // Load stub code for the selected language
         let stubCode = ''
         if (problem.Stub && problem.Stub[firstLanguage]) {
+          // Use problem-specific stub if available
           stubCode = problem.Stub[firstLanguage]
         } else {
+          // Use default stub for the language
           stubCode = getDefaultStubForLanguage(firstLanguage)
         }
         setCode(stubCode)
@@ -3664,18 +3664,14 @@ function AppContent() {
         files[fileName] = code
       }
 
-      // Determine part number for multi-part questions
-      const isMultiPart = selectedProblem.IsMultiPart || selectedProblem.isMultiPart
-      const partNumber = isMultiPart ? selectedPart : 0
-
       const response = await fetch('/api/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ProblemID: selectedProblem.ID || selectedProblem.id,
+          ProblemID: selectedProblem.ID,
           Language: selectedLanguage,
           Files: files,
-          PartNumber: partNumber
+          PartNumber: selectedPart // Include part number for multi-part questions
         })
       })
 
@@ -4161,132 +4157,7 @@ function AppContent() {
               )}
 
               {newProblem.type === 'coding' && (
-              <>
-              <div>
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginBottom: '12px',
-                  color: theme.text,
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  cursor: 'pointer'
-                }}>
-                  <input
-                    type="checkbox"
-                    checked={newProblem.isMultiPart}
-                    onChange={(e) => {
-                      const isMultiPart = e.target.checked
-                      setNewProblem({
-                        ...newProblem,
-                        isMultiPart,
-                        parts: isMultiPart && newProblem.parts.length === 0 
-                          ? [{ partNumber: 1, statement: '', languages: newProblem.languages, stub: newProblem.stub }]
-                          : newProblem.parts
-                      })
-                    }}
-                    style={{ cursor: 'pointer' }}
-                  />
-                  Multi-part Question (with follow-ups)
-                </label>
-              </div>
-
-              {newProblem.isMultiPart && (
-                <div style={{
-                  padding: '16px',
-                  backgroundColor: theme.secondary,
-                  borderRadius: '8px',
-                  border: `1px solid ${theme.border}`,
-                  marginBottom: '16px'
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                    <label style={{ color: theme.text, fontSize: '14px', fontWeight: '600' }}>
-                      Parts ({newProblem.parts.length})
-                    </label>
-                    <button
-                      onClick={() => {
-                        const newPartNum = newProblem.parts.length + 1
-                        setNewProblem({
-                          ...newProblem,
-                          parts: [...newProblem.parts, {
-                            partNumber: newPartNum,
-                            statement: '',
-                            languages: newProblem.languages,
-                            stub: {}
-                          }]
-                        })
-                      }}
-                      style={{
-                        backgroundColor: theme.primary,
-                        color: '#FFFFFF',
-                        border: 'none',
-                        borderRadius: '6px',
-                        padding: '6px 12px',
-                        fontSize: '12px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      + Add Part
-                    </button>
-                  </div>
-                  {newProblem.parts.map((part, idx) => (
-                    <div key={idx} style={{
-                      marginBottom: '12px',
-                      padding: '12px',
-                      backgroundColor: theme.background,
-                      borderRadius: '6px',
-                      border: `1px solid ${theme.border}`
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <label style={{ color: theme.text, fontSize: '13px', fontWeight: '600' }}>
-                          Part {part.partNumber}
-                        </label>
-                        {newProblem.parts.length > 1 && (
-                          <button
-                            onClick={() => {
-                              const updatedParts = newProblem.parts.filter((_, i) => i !== idx)
-                                .map((p, i) => ({ ...p, partNumber: i + 1 }))
-                              setNewProblem({ ...newProblem, parts: updatedParts })
-                            }}
-                            style={{
-                              backgroundColor: 'transparent',
-                              border: 'none',
-                              color: theme.error || '#ff4444',
-                              cursor: 'pointer',
-                              fontSize: '12px'
-                            }}
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </div>
-                      <textarea
-                        value={part.statement}
-                        onChange={(e) => {
-                          const updatedParts = [...newProblem.parts]
-                          updatedParts[idx].statement = e.target.value
-                          setNewProblem({ ...newProblem, parts: updatedParts })
-                        }}
-                        placeholder={`Part ${part.partNumber} statement (builds on previous parts)...`}
-                        style={{
-                          width: '100%',
-                          minHeight: '80px',
-                          padding: '8px',
-                          border: `1px solid ${theme.border}`,
-                          borderRadius: '4px',
-                          backgroundColor: theme.background,
-                          color: theme.text,
-                          fontSize: '13px',
-                          resize: 'vertical',
-                          fontFamily: 'inherit'
-                        }}
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-
+                <>
               <div>
                 <label style={{
                   display: 'block',
@@ -4329,7 +4200,142 @@ function AppContent() {
                     </label>
                     ))}
                 </div>
+                  </div>
+
+                  <div>
+                    <label style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      marginBottom: '12px',
+                      color: theme.text,
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      cursor: 'pointer'
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={newProblem.isMultiPart}
+                        onChange={(e) => {
+                          const isMultiPart = e.target.checked
+                          setNewProblem({
+                            ...newProblem,
+                            isMultiPart,
+                            parts: isMultiPart && newProblem.parts.length === 0 
+                              ? [{ partNumber: 2, statement: '', stub: {} }]
+                              : newProblem.parts
+                          })
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      />
+                      Multi-part Question (with follow-ups)
+                    </label>
+                    {newProblem.isMultiPart && (
+                      <div style={{
+                        marginTop: '12px',
+                        fontSize: '12px',
+                        color: theme.textSecondary,
+                        fontStyle: 'italic',
+                        marginLeft: '24px'
+                      }}>
+                        Part 1 will be the main question above. Add follow-up parts that build on it.
               </div>
+              )}
+                  </div>
+
+                  {newProblem.isMultiPart && (
+                    <div style={{
+                      padding: '16px',
+                      backgroundColor: theme.secondary,
+                      borderRadius: '8px',
+                      border: `1px solid ${theme.border}`,
+                      marginTop: '16px'
+                    }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <label style={{ color: theme.text, fontSize: '14px', fontWeight: '600' }}>
+                      Follow-up Parts ({newProblem.parts.length})
+                    </label>
+                    <button
+                      onClick={() => {
+                        const newPartNum = newProblem.parts.length + 2
+                        setNewProblem({
+                          ...newProblem,
+                          parts: [...newProblem.parts, {
+                            partNumber: newPartNum,
+                            statement: '',
+                            stub: {}
+                          }]
+                        })
+                      }}
+                      style={{
+                        backgroundColor: theme.primary,
+                        color: '#FFFFFF',
+                        border: 'none',
+                        borderRadius: '6px',
+                        padding: '6px 12px',
+                        fontSize: '12px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      + Add Part
+                    </button>
+                  </div>
+                  {newProblem.parts.map((part, idx) => (
+                    <div key={idx} style={{
+                      marginBottom: '12px',
+                      padding: '12px',
+                      backgroundColor: theme.background,
+                      borderRadius: '6px',
+                      border: `1px solid ${theme.border}`
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <label style={{ color: theme.text, fontSize: '13px', fontWeight: '600' }}>
+                          Part {part.partNumber}
+                        </label>
+                        {newProblem.parts.length > 1 && (
+                          <button
+                            onClick={() => {
+                              const updatedParts = newProblem.parts.filter((_, i) => i !== idx)
+                                .map((p, i) => ({ ...p, partNumber: i + 2 }))
+                              setNewProblem({ ...newProblem, parts: updatedParts })
+                            }}
+                            style={{
+                              backgroundColor: 'transparent',
+                              border: 'none',
+                              color: theme.error || '#ff4444',
+                              cursor: 'pointer',
+                              fontSize: '12px'
+                            }}
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                      <textarea
+                        value={part.statement}
+                        onChange={(e) => {
+                          const updatedParts = [...newProblem.parts]
+                          updatedParts[idx].statement = e.target.value
+                          setNewProblem({ ...newProblem, parts: updatedParts })
+                        }}
+                        placeholder={`Part ${part.partNumber} statement (builds on previous parts)...`}
+                        style={{
+                          width: '100%',
+                          minHeight: '80px',
+                          padding: '8px',
+                          border: `1px solid ${theme.border}`,
+                          borderRadius: '4px',
+                          backgroundColor: theme.background,
+                          color: theme.text,
+                          fontSize: '13px',
+                          resize: 'vertical',
+                          fontFamily: 'inherit'
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
               </>
               )}
 
@@ -4365,12 +4371,12 @@ function AppContent() {
                     }
                     if (newProblem.isMultiPart) {
                       if (newProblem.parts.length === 0) {
-                        alert('Please add at least one part')
+                        alert('Please add at least one follow-up part or uncheck multi-part')
                         return
                       }
                       for (let i = 0; i < newProblem.parts.length; i++) {
                         if (!newProblem.parts[i].statement.trim()) {
-                          alert(`Please fill in statement for Part ${i + 1}`)
+                          alert(`Please fill in statement for Part ${newProblem.parts[i].partNumber}`)
                           return
                         }
                       }
@@ -4379,16 +4385,20 @@ function AppContent() {
                     try {
                       // Prepare the request body
                       const requestBody = {
-                        ...newProblem,
+                        title: newProblem.title,
+                        statement: newProblem.statement,
+                        languages: newProblem.languages,
+                        stub: newProblem.stub,
+                        type: newProblem.type,
+                        drawingData: newProblem.drawingData,
                         IsMultiPart: newProblem.isMultiPart,
-                        Parts: newProblem.isMultiPart ? newProblem.parts.map((p, idx) => ({
-                          partNumber: idx + 1,
+                        Parts: newProblem.isMultiPart ? newProblem.parts.map(p => ({
+                          partNumber: p.partNumber,
                           statement: p.statement,
-                          languages: p.languages || newProblem.languages,
                           stub: p.stub || {}
                         })) : []
                       }
-                      
+
                       const response = await fetch('/api/problems/create', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -4742,6 +4752,7 @@ function AppContent() {
               </div>
 
               {agentRequest.questionType === 'coding' && (
+                <>
               <div>
                 <label style={{
                   display: 'block',
@@ -4789,38 +4800,37 @@ function AppContent() {
                   Generated questions will prioritize this language
                 </div>
               </div>
-              )}
 
-              {agentRequest.questionType === 'coding' && (
-              <div>
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginBottom: '8px',
-                  color: theme.text,
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  cursor: 'pointer'
-                }}>
-                  <input
-                    type="checkbox"
-                    checked={agentRequest.includeMultiPart}
-                    onChange={(e) => setAgentRequest({...agentRequest, includeMultiPart: e.target.checked})}
-                    style={{ cursor: 'pointer' }}
-                  />
-                  Include Multi-part Questions
-                </label>
-                <div style={{
-                  marginTop: '4px',
-                  marginLeft: '24px',
-                  fontSize: '12px',
-                  color: theme.textSecondary,
-                  fontStyle: 'italic'
-                }}>
-                  Some generated questions will have follow-up parts that build on the initial problem
-                </div>
-              </div>
+                  <div>
+                    <label style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      marginBottom: '8px',
+                      color: theme.text,
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={agentRequest.includeMultiPart}
+                        onChange={(e) => setAgentRequest({...agentRequest, includeMultiPart: e.target.checked})}
+                        style={{ cursor: 'pointer' }}
+                      />
+                      Include Multi-part Questions
+                    </label>
+                    <div style={{
+                      marginTop: '4px',
+                      marginLeft: '24px',
+                      fontSize: '12px',
+                      color: theme.textSecondary,
+                      fontStyle: 'italic'
+                    }}>
+                      Some generated questions will have follow-up parts that build on the initial problem
+                    </div>
+                  </div>
+                </>
               )}
 
               <div>
@@ -5344,6 +5354,7 @@ function AppContent() {
                         }}>
                           {problemTitle}
                         </div>
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                         {problemType === 'system_design' && (
                           <span style={{
                             backgroundColor: selectedProblem && (selectedProblem.ID || selectedProblem.id) === problemID
@@ -5362,6 +5373,25 @@ function AppContent() {
                             System Design
                           </span>
                         )}
+                          {(problem.IsMultiPart || problem.isMultiPart) && (problem.Parts || problem.parts) && (problem.Parts || problem.parts).length > 0 && (
+                            <span style={{
+                              backgroundColor: selectedProblem && (selectedProblem.ID || selectedProblem.id) === problemID
+                                ? 'rgba(255,255,255,0.2)'
+                                : theme.accent,
+                              color: selectedProblem && (selectedProblem.ID || selectedProblem.id) === problemID
+                                ? '#FFFFFF'
+                                : '#FFFFFF',
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              fontWeight: '600',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px'
+                            }}>
+                              Multi-Part ({(problem.Parts || problem.parts).length + 1})
+                            </span>
+                          )}
+                        </div>
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
@@ -5680,7 +5710,7 @@ function AppContent() {
                                   transition: 'all 0.2s ease'
                                 }}
                               >
-                                Part {idx + 2}
+                                Part {part.partNumber}
                               </button>
                             ))}
                           </div>
@@ -5918,32 +5948,11 @@ function AppContent() {
                           onChange={(e) => {
                             const newLanguage = e.target.value
                             setSelectedLanguage(newLanguage)
-                            // Handle multi-part questions
-                            const isMultiPart = selectedProblem && (selectedProblem.IsMultiPart || selectedProblem.isMultiPart)
-                            const parts = selectedProblem && (selectedProblem.Parts || selectedProblem.parts || [])
                             let newCode = ''
-                            if (isMultiPart && parts.length > 0) {
-                              if (selectedPart === 0) {
-                                if (selectedProblem.Stub && selectedProblem.Stub[newLanguage]) {
-                                  newCode = partCodes[0] || selectedProblem.Stub[newLanguage]
-                                } else {
-                                  newCode = partCodes[0] || getDefaultStubForLanguage(newLanguage)
-                                }
-                              } else {
-                                const part = parts[selectedPart - 1]
-                                const partStub = part.stub || part.Stub || {}
-                                if (partStub[newLanguage]) {
-                                  newCode = partCodes[selectedPart] || partStub[newLanguage]
-                                } else {
-                                  newCode = partCodes[selectedPart] || getDefaultStubForLanguage(newLanguage)
-                                }
-                              }
-                            } else {
                             if (selectedProblem && selectedProblem.Stub && selectedProblem.Stub[newLanguage]) {
                               newCode = selectedProblem.Stub[newLanguage]
                             } else {
                               newCode = getDefaultStubForLanguage(newLanguage)
-                              }
                             }
                             setCode(newCode)
                           }}

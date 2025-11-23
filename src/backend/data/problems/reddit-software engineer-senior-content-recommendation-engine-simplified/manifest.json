@@ -1,0 +1,22 @@
+{
+  "ID": "reddit-software engineer-senior-content-recommendation-engine-simplified",
+  "Title": "Content Recommendation Engine (Simplified)",
+  "Statement": "Reddit aims to connect users with content they'll love. Implement a simplified content recommendation engine. Given a list of posts and a user's upvoted history, recommend new posts that the user is likely to be interested in.\n\nEach `Post` object has an `id` and a list of `tags` (strings). A user's `upvoted_posts` is a list of post IDs they have liked.\n\nImplement a function `recommend_posts(all_posts, upvoted_posts, num_recommendations)` that returns a list of `num_recommendations` post IDs. The recommendations should:\n1.  Not include any posts already in `upvoted_posts`.\n2.  Prioritize posts with `tags` that frequently appear in the user's `upvoted_posts`.\n3.  For posts with similar tag relevance, prioritize newer posts (assume higher `id` implies newer for simplicity if no timestamp is provided).\n\n**Example Input:**\n`all_posts = [`\n  `{'id': 'p1', 'tags': ['tech', 'programming', 'python']},`\n  `{'id': 'p2', 'tags': ['cats', 'memes']},`\n  `{'id': 'p3', 'tags': ['programming', 'java', 'algorithms']},`\n  `{'id': 'p4', 'tags': ['tech', 'gadgets']},`\n  `{'id': 'p5', 'tags': ['python', 'data_science']}`\n`]`\n`upvoted_posts = ['p1']`\n`num_recommendations = 2`\n\n**Example Output:**\n`['p5', 'p3']` (p5 has 'python' from p1, p3 has 'programming' from p1. Order depends on tie-breaking logic, e.g., recency.)",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {
+    "cpp": "#include \u003cstring\u003e\n#include \u003cvector\u003e\n#include \u003cunordered_set\u003e\n#include \u003cmap\u003e\n#include \u003calgorithm\u003e\n\nstruct Post {\n    std::string id;\n    std::vector\u003cstd::string\u003e tags;\n};\n\nclass Solution {\npublic:\n    std::vector\u003cstd::string\u003e recommendPosts(const std::vector\u003cPost\u003e\u0026 all_posts, \n                                            const std::vector\u003cstd::string\u003e\u0026 upvoted_posts, \n                                            int num_recommendations) {\n        // Your code here\n        return {};\n    }\n};",
+    "go": "package main\n\ntype Post struct {\n    Id   string\n    Tags []string\n}\n\nfunc RecommendPosts(allPosts []Post, upvotedPosts []string, numRecommendations int) []string {\n    // Your code here\n    return []string{}\n}",
+    "java": "import java.util.*;\n\nclass Post {\n    String id;\n    List\u003cString\u003e tags;\n\n    public Post(String id, List\u003cString\u003e tags) {\n        this.id = id;\n        this.tags = tags;\n    }\n}\n\nclass Solution {\n    public List\u003cString\u003e recommendPosts(List\u003cPost\u003e allPosts, List\u003cString\u003e upvotedPosts, int numRecommendations) {\n        // Your code here\n        return new ArrayList\u003c\u003e();\n    }\n}",
+    "javascript": "class Post {\n    constructor(id, tags) {\n        this.id = id;\n        this.tags = tags;\n    }\n}\n\nfunction recommendPosts(allPosts, upvotedPosts, numRecommendations) {\n    // Your code here\n    return [];\n}",
+    "python": "class Post:\n    def __init__(self, id: str, tags: list[str]):\n        self.id = id\n        self.tags = tags\n\ndef recommend_posts(all_posts: list[Post], upvoted_posts: list[str], num_recommendations: int) -\u003e list[str]:\n    # Your code here\n    pass",
+    "rust": "use std::collections::{HashMap, HashSet};\n\npub struct Post {\n    id: String,\n    tags: Vec\u003cString\u003e,\n}\n\npub fn recommend_posts(all_posts: Vec\u003cPost\u003e, upvoted_posts: Vec\u003cString\u003e, num_recommendations: usize) -\u003e Vec\u003cString\u003e {\n    // Your code here\n    vec![]\n}"
+  },
+  "Type": "coding"
+}

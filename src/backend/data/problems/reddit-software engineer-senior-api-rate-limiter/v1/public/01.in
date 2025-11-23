@@ -1,0 +1,2 @@
+POST /api/login
+{"username": "test", "password": "pass"}

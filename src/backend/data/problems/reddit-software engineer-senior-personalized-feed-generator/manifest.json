@@ -1,0 +1,22 @@
+{
+  "ID": "reddit-software engineer-senior-personalized-feed-generator",
+  "Title": "Personalized Feed Generator",
+  "Statement": "Reddit users expect a personalized feed that reflects their interests and activity. Design and implement a system that can generate a user's feed based on their subscriptions and activity. You will be given a user's ID, a list of subreddits they are subscribed to, and a stream of `Post` objects. Each `Post` has an `id`, `subreddit_id`, `score` (upvotes - downvotes), and `timestamp`.\n\n**Part 1: Basic Feed Generation**\nImplement a function `generate_basic_feed(user_id, subscribed_subreddits, posts)` that returns a list of post IDs. The feed should only contain posts from `subscribed_subreddits`. The posts should be sorted primarily by their `score` in descending order, and then by `timestamp` in descending order for posts with the same score.\n\n**Example Input:**\n`subscribed_subreddits = ['r/programming', 'r/askreddit']`\n`posts = [`\n  `{'id': 'p1', 'subreddit_id': 'r/programming', 'score': 150, 'timestamp': 1678886400},`\n  `{'id': 'p2', 'subreddit_id': 'r/askreddit', 'score': 200, 'timestamp': 1678886500},`\n  `{'id': 'p3', 'subreddit_id': 'r/tech', 'score': 300, 'timestamp': 1678886600},`\n  `{'id': 'p4', 'subreddit_id': 'r/programming', 'score': 150, 'timestamp': 1678886300}`\n`]`\n\n**Example Output for Part 1:**\n`['p2', 'p1', 'p4']` (p3 is excluded as not in subscribed_subreddits)\n\nConsider the scale: There can be millions of users, billions of posts, and thousands of subreddits. Optimize for efficient generation.",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {
+    "cpp": "#include \u003cstring\u003e\n#include \u003cvector\u003e\n#include \u003calgorithm\u003e\n\nstruct Post {\n    std::string id;\n    std::string subreddit_id;\n    int score;\n    long long timestamp;\n};\n\nclass Solution {\npublic:\n    std::vector\u003cstd::string\u003e generateBasicFeed(const std::string\u0026 user_id,\n                                               const std::vector\u003cstd::string\u003e\u0026 subscribed_subreddits,\n                                               const std::vector\u003cPost\u003e\u0026 posts) {\n        // Your code here for Part 1\n        return {};\n    }\n};",
+    "go": "package main\n\ntype Post struct {\n    Id          string\n    SubredditId string\n    Score       int\n    Timestamp   int64\n}\n\nfunc GenerateBasicFeed(userId string, subscribedSubreddits []string, posts []Post) []string {\n    // Your code here for Part 1\n    return []string{}\n}",
+    "java": "import java.util.*;\n\nclass Post {\n    String id;\n    String subredditId;\n    int score;\n    long timestamp;\n\n    public Post(String id, String subredditId, int score, long timestamp) {\n        this.id = id;\n        this.subredditId = subredditId;\n        this.score = score;\n        this.timestamp = timestamp;\n    }\n}\n\nclass Solution {\n    public List\u003cString\u003e generateBasicFeed(String userId, List\u003cString\u003e subscribedSubreddits, List\u003cPost\u003e posts) {\n        // Your code here for Part 1\n        return new ArrayList\u003c\u003e();\n    }\n}",
+    "javascript": "class Post {\n    constructor(id, subreddit_id, score, timestamp) {\n        this.id = id;\n        this.subreddit_id = subreddit_id;\n        this.score = score;\n        this.timestamp = timestamp;\n    }\n}\n\nfunction generateBasicFeed(userId, subscribedSubreddits, posts) {\n    // Your code here for Part 1\n    return [];\n}",
+    "python": "class Post:\n    def __init__(self, id, subreddit_id, score, timestamp):\n        self.id = id\n        self.subreddit_id = subreddit_id\n        self.score = score\n        self.timestamp = timestamp\n\ndef generate_basic_feed(user_id: str, subscribed_subreddits: list[str], posts: list[Post]) -\u003e list[str]:\n    # Your code here for Part 1\n    pass",
+    "rust": "struct Post {\n    id: String,\n    subreddit_id: String,\n    score: i32,\n    timestamp: i64,\n}\n\nfn generate_basic_feed(user_id: \u0026str, subscribed_subreddits: \u0026[String], posts: \u0026[Post]) -\u003e Vec\u003cString\u003e {\n    // Your code here for Part 1\n    vec![]\n}"
+  },
+  "Type": "coding"
+}
