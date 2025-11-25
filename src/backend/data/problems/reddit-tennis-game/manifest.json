@@ -1,0 +1,24 @@
+{
+  "ID": "reddit-tennis-game",
+  "Title": "Reddit Tennis Game",
+  "Statement": "Design a class to track the score of a tennis game to support 3 operations:\n\nAdd points for a player\nCheck the current score\nGet the result/winner of the game\nSome other requirements:\n\nA player must be leading by at least 2 points to win\nIf the score reaches beyond 3-3 (e.g., 4-4, 5-5), it should reset to 3-3\nOnce a player wins, no more points can be added\nThings to Consider:\n\nWhat to return when there's no winner yet",
+  "Languages": [
+    "python",
+    "cpp",
+    "java",
+    "kotlin",
+    "go"
+  ],
+  "Stub": {
+    "python": ""
+  },
+  "Type": "coding",
+  "IsMultiPart": true,
+  "Parts": [
+    {
+      "partNumber": 2,
+      "statement": "Part 2\n\nConvert score to tennis points system (i.e. \"deuce\", \"love\" etc.)",
+      "stub": {}
+    }
+  ]
+}

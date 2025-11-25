@@ -1,0 +1,24 @@
+{
+  "ID": "reddit-chat-messages",
+  "Title": "Reddit Chat Messages",
+  "Statement": "The core task of this problem is to implement the function:\n\nmerge_messages(ids [])\nThe specific requirements are as follows:\n\nRetrieve chat messages: Given a list of chat message IDs (already provided), each ID can be used to fetch its surrounding messages (5 before and 5 after, including itself) using the provided function:\nget_chat_messages(id)\nMerge results: Combine all messages retrieved from the given IDs into a single collection.\nDeduplication: If multiple IDs retrieve overlapping messages, duplicates must be removed.\nSorting: The final returned messages should be sorted by ID.\nThe problem explicitly states that you cannot simply use a Set for deduplication and sorting. Instead, you need to think of alternative ways to accomplish the task.\n",
+  "Languages": [
+    "python",
+    "cpp",
+    "java",
+    "kotlin",
+    "go"
+  ],
+  "Stub": {
+    "python": ""
+  },
+  "Type": "coding",
+  "IsMultiPart": true,
+  "Parts": [
+    {
+      "partNumber": 2,
+      "statement": "If messages support modifications and different versions are saved, how would you handle it?",
+      "stub": {}
+    }
+  ]
+}

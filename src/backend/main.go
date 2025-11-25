@@ -1900,28 +1900,13 @@ func callAgentAPI(req AgentRequest) ([]Problem, error) {
 		log.Printf("Web search did not return additional information")
 	}
 
-	var apiKey string
-	if req.APIKey != "" {
-		// Use API key from request (frontend)
-		apiKey = req.APIKey
-		log.Printf("Using API key from request for provider: %s (key length: %d)", provider, len(apiKey))
-	} else {
-		// Fallback to environment variables
-		switch provider {
-		case "gemini":
-			apiKey = os.Getenv("GEMINI_API_KEY")
-		case "openai":
-			apiKey = os.Getenv("OPENAI_API_KEY")
-		case "claude":
-			apiKey = os.Getenv("ANTHROPIC_API_KEY")
-		}
-		log.Printf("Using API key from environment for provider: %s (key length: %d)", provider, len(apiKey))
-	}
-
+	// API key must be provided from the frontend - no environment variable fallback
+	apiKey := req.APIKey
 	if apiKey == "" {
-		log.Printf("%s API key not found, using mock questions", strings.ToUpper(provider))
-		return generateMockQuestions(req), nil
+		log.Printf("%s API key not provided in request", strings.ToUpper(provider))
+		return nil, fmt.Errorf("API key is required for %s - please enter your API key in the form", provider)
 	}
+	log.Printf("Using API key from request for provider: %s (key length: %d)", provider, len(apiKey))
 
 	// Call appropriate provider
 	aiStart := time.Now()

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, lazy, Suspense, useLayoutEffect } from 'react'
+import React, { useEffect, useState, useRef, lazy, Suspense, useLayoutEffect, useMemo } from 'react'
 import '@excalidraw/excalidraw/index.css'
 import Editor from '@monaco-editor/react'
 import { Terminal } from '@xterm/xterm'
@@ -260,7 +260,7 @@ const styles = {
   }
 }
 
-// Terminal component using xterm.js
+// Terminal component using xterm.js (output only)
 const TerminalComponent = ({ output, theme, isDarkMode }) => {
   const terminalRef = useRef(null)
   const terminalInstanceRef = useRef(null)
@@ -269,7 +269,6 @@ const TerminalComponent = ({ output, theme, isDarkMode }) => {
   useEffect(() => {
     if (!terminalRef.current) return
 
-    // Initialize terminal
     const terminal = new Terminal({
       theme: {
         background: isDarkMode ? '#1E1E1E' : '#0D1117',
@@ -296,10 +295,10 @@ const TerminalComponent = ({ output, theme, isDarkMode }) => {
       fontSize: 13,
       fontFamily: '"SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, monospace',
       lineHeight: 1.5,
-      cursorBlink: true,
+      cursorBlink: false,
       cursorStyle: 'block',
       scrollback: 1000,
-      padding: 12
+      disableStdin: true
     })
 
     const fitAddon = new FitAddon()
@@ -310,7 +309,6 @@ const TerminalComponent = ({ output, theme, isDarkMode }) => {
     terminalInstanceRef.current = terminal
     fitAddonRef.current = fitAddon
 
-    // Handle window resize
     const handleResize = () => {
       if (fitAddonRef.current) {
         fitAddonRef.current.fit()
@@ -324,41 +322,450 @@ const TerminalComponent = ({ output, theme, isDarkMode }) => {
     }
   }, [isDarkMode])
 
-  // Update terminal output when output changes
   useEffect(() => {
     if (!terminalInstanceRef.current) return
-
-    // Clear terminal and write new output
     terminalInstanceRef.current.clear()
     if (output) {
-      // Ensure output ends with proper line break
-      const formattedOutput = output.endsWith('\n') || output.endsWith('\r\n') ? output : output + '\r\n'
+      // Convert all \n to \r\n for proper terminal display
+      // First normalize any existing \r\n to \n, then convert all \n to \r\n
+      const formattedOutput = output
+        .replace(/\r\n/g, '\n')  // Normalize CRLF to LF
+        .replace(/\r/g, '\n')     // Normalize CR to LF
+        .replace(/\n/g, '\r\n')   // Convert all LF to CRLF for xterm
       terminalInstanceRef.current.write(formattedOutput)
     } else {
       terminalInstanceRef.current.write('Run your code to see output here...\r\n')
     }
   }, [output])
 
-  // Fit terminal when container size changes
   useEffect(() => {
     if (fitAddonRef.current) {
-      setTimeout(() => {
-        fitAddonRef.current.fit()
-      }, 100)
+      setTimeout(() => fitAddonRef.current.fit(), 100)
     }
   }, [output])
 
   return (
-    <div
-      ref={terminalRef}
-    style={{
-      width: '100%',
-        height: '100%',
-        boxSizing: 'border-box'
-      }}
-    />
+    <div ref={terminalRef} style={{ width: '100%', height: '100%', boxSizing: 'border-box' }} />
   )
 }
+
+// JupyterLite component for ML notebook functionality
+const JupyterLiteNotebook = React.memo(({ isDarkMode, theme }) => {
+  const iframeRef = useRef(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [useEmbedded, setUseEmbedded] = useState(true)
+
+  // JupyterLite CDN URL - uses the official JupyterLite deployment
+  const jupyterLiteUrl = 'https://jupyterlite.github.io/demo/lab/index.html'
+  
+  // Memoize the pyodide notebook content to prevent recreation on every render
+  const pyodideNotebookContent = useMemo(() => `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>Python Notebook</title>
+      <script src="https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"></script>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          background: ${isDarkMode ? '#1E1E1E' : '#FFFFFF'};
+          color: ${isDarkMode ? '#D4D4D4' : '#1F2937'};
+          height: 100vh;
+          display: flex;
+          flex-direction: column;
+        }
+        .header {
+          padding: 12px 16px;
+          background: ${isDarkMode ? '#252526' : '#F3F4F6'};
+          border-bottom: 1px solid ${isDarkMode ? '#3C3C3C' : '#E5E7EB'};
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .title { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .status { font-size: 12px; color: ${isDarkMode ? '#888' : '#6B7280'}; }
+        .status.ready { color: #10B981; }
+        .status.loading { color: #F59E0B; }
+        .toolbar { display: flex; gap: 8px; }
+        .btn {
+          padding: 6px 12px;
+          border: none;
+          border-radius: 6px;
+          font-size: 12px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .btn-primary { background: #3B82F6; color: white; }
+        .btn-primary:hover { background: #2563EB; }
+        .btn-primary:disabled { background: #9CA3AF; cursor: not-allowed; }
+        .btn-secondary { background: ${isDarkMode ? '#374151' : '#E5E7EB'}; color: ${isDarkMode ? '#D4D4D4' : '#1F2937'}; }
+        .btn-secondary:hover { background: ${isDarkMode ? '#4B5563' : '#D1D5DB'}; }
+        .cells { flex: 1; overflow-y: auto; padding: 16px; }
+        .cell {
+          margin-bottom: 16px;
+          border: 1px solid ${isDarkMode ? '#3C3C3C' : '#E5E7EB'};
+          border-radius: 8px;
+          overflow: hidden;
+        }
+        .cell-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 8px 12px;
+          background: ${isDarkMode ? '#2D2D30' : '#F9FAFB'};
+          border-bottom: 1px solid ${isDarkMode ? '#3C3C3C' : '#E5E7EB'};
+        }
+        .cell-info { display: flex; align-items: center; gap: 8px; }
+        .cell-num { font-size: 12px; color: ${isDarkMode ? '#888' : '#6B7280'}; font-family: monospace; }
+        .cell-actions { display: flex; gap: 4px; }
+        .cell-btn {
+          padding: 4px 8px;
+          border: none;
+          border-radius: 4px;
+          font-size: 11px;
+          cursor: pointer;
+          background: ${isDarkMode ? '#374151' : '#E5E7EB'};
+          color: ${isDarkMode ? '#D4D4D4' : '#374151'};
+        }
+        .cell-btn:hover { background: ${isDarkMode ? '#4B5563' : '#D1D5DB'}; }
+        .cell-btn.run { background: #3B82F6; color: white; }
+        .cell-btn.run:hover { background: #2563EB; }
+        .code-input {
+          width: 100%;
+          padding: 12px;
+          border: none;
+          background: ${isDarkMode ? '#1E1E1E' : '#FFFFFF'};
+          color: ${isDarkMode ? '#D4D4D4' : '#1F2937'};
+          font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+          font-size: 13px;
+          line-height: 1.5;
+          resize: vertical;
+          min-height: 80px;
+          outline: none;
+        }
+        .output {
+          padding: 12px;
+          background: ${isDarkMode ? '#252526' : '#F9FAFB'};
+          border-top: 1px solid ${isDarkMode ? '#3C3C3C' : '#E5E7EB'};
+          font-family: 'SF Mono', Monaco, monospace;
+          font-size: 13px;
+          white-space: pre-wrap;
+          max-height: 300px;
+          overflow-y: auto;
+        }
+        .output.error { color: #EF4444; }
+        .output.success { color: #10B981; }
+        .packages-info {
+          padding: 12px;
+          background: ${isDarkMode ? '#1E3A5F' : '#EFF6FF'};
+          border-radius: 8px;
+          margin-bottom: 16px;
+          font-size: 12px;
+          color: ${isDarkMode ? '#93C5FD' : '#1D4ED8'};
+        }
+        .packages-info strong { display: block; margin-bottom: 4px; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <div class="title">
+          <span>🐍</span>
+          <span>Python Notebook</span>
+          <span id="status" class="status loading">Loading Python...</span>
+        </div>
+        <div class="toolbar">
+          <button class="btn btn-primary" id="runAll" disabled>▶ Run All</button>
+          <button class="btn btn-secondary" id="addCell">+ Add Cell</button>
+          <button class="btn btn-secondary" id="clearAll">Clear All</button>
+        </div>
+      </div>
+      <div class="cells" id="cells">
+        <div class="packages-info">
+          <strong>📦 Available Packages:</strong>
+          numpy, pandas, scikit-learn, matplotlib, scipy, sympy, networkx, and more.
+          Use <code>import micropip; await micropip.install('package')</code> to install additional packages.
+        </div>
+      </div>
+      <script>
+        let pyodide = null;
+        let cellCount = 0;
+        const cells = [];
+        
+        async function initPyodide() {
+          try {
+            pyodide = await loadPyodide();
+            await pyodide.loadPackage(['numpy', 'pandas', 'scikit-learn', 'matplotlib', 'micropip']);
+            
+            // Setup matplotlib for inline display
+            await pyodide.runPythonAsync(\`
+import matplotlib
+matplotlib.use('AGG')
+import matplotlib.pyplot as plt
+import io
+import base64
+
+def show_plot():
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+    buf.seek(0)
+    img_str = base64.b64encode(buf.read()).decode()
+    plt.close()
+    return f'<img src="data:image/png;base64,{img_str}" />'
+            \`);
+            
+            document.getElementById('status').textContent = 'Ready';
+            document.getElementById('status').className = 'status ready';
+            document.getElementById('runAll').disabled = false;
+            addCell();
+          } catch (err) {
+            document.getElementById('status').textContent = 'Error: ' + err.message;
+            document.getElementById('status').className = 'status error';
+          }
+        }
+        
+        function addCell(code = '') {
+          cellCount++;
+          const cellId = 'cell-' + cellCount;
+          const cellDiv = document.createElement('div');
+          cellDiv.className = 'cell';
+          cellDiv.id = cellId;
+          cellDiv.innerHTML = \`
+            <div class="cell-header">
+              <div class="cell-info">
+                <span class="cell-num">In [\${cellCount}]:</span>
+              </div>
+              <div class="cell-actions">
+                <button class="cell-btn run" onclick="runCell('\${cellId}')">▶ Run</button>
+                <button class="cell-btn" onclick="clearCell('\${cellId}')">Clear</button>
+                <button class="cell-btn" onclick="deleteCell('\${cellId}')">×</button>
+              </div>
+            </div>
+            <textarea class="code-input" id="\${cellId}-code" placeholder="Enter Python code...">\${code}</textarea>
+            <div class="output" id="\${cellId}-output" style="display: none;"></div>
+          \`;
+          document.getElementById('cells').appendChild(cellDiv);
+          cells.push(cellId);
+          
+          // Add Shift+Enter handler
+          const textarea = document.getElementById(cellId + '-code');
+          textarea.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.shiftKey) {
+              e.preventDefault();
+              runCell(cellId);
+            }
+          });
+        }
+        
+        async function runCell(cellId) {
+          if (!pyodide) return;
+          const codeEl = document.getElementById(cellId + '-code');
+          const outputEl = document.getElementById(cellId + '-output');
+          const code = codeEl.value;
+          
+          outputEl.style.display = 'block';
+          outputEl.className = 'output';
+          outputEl.textContent = 'Running...';
+          
+          try {
+            // Redirect stdout
+            await pyodide.runPythonAsync(\`
+import sys
+from io import StringIO
+_stdout = sys.stdout
+sys.stdout = StringIO()
+            \`);
+            
+            const result = await pyodide.runPythonAsync(code);
+            
+            // Get stdout content
+            const stdout = await pyodide.runPythonAsync(\`
+_output = sys.stdout.getvalue()
+sys.stdout = _stdout
+_output
+            \`);
+            
+            let output = stdout || '';
+            if (result !== undefined && result !== null) {
+              const resultStr = result.toString ? result.toString() : String(result);
+              if (resultStr && resultStr !== 'undefined' && resultStr !== 'None') {
+                output += (output ? '\\n' : '') + resultStr;
+              }
+            }
+            
+            // Check for plot
+            if (code.includes('plt.') && !code.includes('plt.close()')) {
+              try {
+                const plotHtml = await pyodide.runPythonAsync('show_plot()');
+                outputEl.innerHTML = (output ? '<pre>' + output + '</pre>' : '') + plotHtml;
+              } catch (e) {
+                outputEl.textContent = output || '(Cell executed)';
+              }
+            } else {
+              outputEl.textContent = output || '(Cell executed)';
+            }
+            outputEl.className = 'output success';
+          } catch (err) {
+            outputEl.textContent = err.message;
+            outputEl.className = 'output error';
+          }
+        }
+        
+        async function runAllCells() {
+          for (const cellId of cells) {
+            await runCell(cellId);
+          }
+        }
+        
+        function clearCell(cellId) {
+          document.getElementById(cellId + '-code').value = '';
+          const outputEl = document.getElementById(cellId + '-output');
+          outputEl.style.display = 'none';
+          outputEl.textContent = '';
+        }
+        
+        function deleteCell(cellId) {
+          if (cells.length <= 1) return;
+          const idx = cells.indexOf(cellId);
+          if (idx > -1) {
+            cells.splice(idx, 1);
+            document.getElementById(cellId).remove();
+          }
+        }
+        
+        function clearAllCells() {
+          cells.forEach(cellId => {
+            document.getElementById(cellId + '-code').value = '';
+            const outputEl = document.getElementById(cellId + '-output');
+            outputEl.style.display = 'none';
+            outputEl.textContent = '';
+          });
+        }
+        
+        document.getElementById('runAll').onclick = runAllCells;
+        document.getElementById('addCell').onclick = () => addCell();
+        document.getElementById('clearAll').onclick = clearAllCells;
+        
+        initPyodide();
+      </script>
+    </body>
+    </html>
+  `, [isDarkMode])
+
+  const handleIframeLoad = () => {
+    setIsLoading(false)
+  }
+
+  const handleIframeError = () => {
+    setError('Failed to load notebook environment')
+    setIsLoading(false)
+  }
+
+  return (
+    <div style={{
+      width: '100%',
+      height: '100%',
+      display: 'flex',
+      flexDirection: 'column',
+      backgroundColor: isDarkMode ? '#1E1E1E' : '#FFFFFF'
+    }}>
+      {/* Header with mode toggle */}
+      <div style={{
+        padding: '8px 16px',
+        borderBottom: `1px solid ${isDarkMode ? '#3C3C3C' : '#E5E7EB'}`,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: isDarkMode ? '#252526' : '#F9FAFB',
+        flexShrink: 0
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ fontSize: '14px', fontWeight: '600', color: isDarkMode ? '#D4D4D4' : '#1F2937' }}>
+            🐍 ML Notebook
+          </span>
+          {isLoading && (
+            <span style={{ fontSize: '12px', color: '#F59E0B' }}>
+              Loading Python environment...
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            onClick={() => setUseEmbedded(!useEmbedded)}
+            style={{
+              padding: '4px 10px',
+              backgroundColor: isDarkMode ? '#374151' : '#E5E7EB',
+              color: isDarkMode ? '#D4D4D4' : '#374151',
+              border: 'none',
+              borderRadius: '4px',
+              fontSize: '11px',
+              cursor: 'pointer',
+              fontWeight: '500'
+            }}
+          >
+            {useEmbedded ? '🔗 Open JupyterLite' : '📓 Use Embedded'}
+          </button>
+        </div>
+      </div>
+      
+      {/* Notebook content */}
+      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+        {error ? (
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100%',
+            color: isDarkMode ? '#F87171' : '#EF4444',
+            textAlign: 'center',
+            padding: '20px'
+          }}>
+            <span style={{ fontSize: '48px', marginBottom: '16px' }}>⚠️</span>
+            <p>{error}</p>
+            <button
+              onClick={() => {
+                setError(null)
+                setIsLoading(true)
+              }}
+              style={{
+                marginTop: '16px',
+                padding: '8px 16px',
+                backgroundColor: theme.primary,
+                color: '#FFFFFF',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer'
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          <iframe
+            ref={iframeRef}
+            srcDoc={useEmbedded ? pyodideNotebookContent : undefined}
+            src={useEmbedded ? undefined : jupyterLiteUrl}
+            onLoad={handleIframeLoad}
+            onError={handleIframeError}
+            loading="lazy"
+            style={{
+              width: '100%',
+              height: '100%',
+              border: 'none',
+              backgroundColor: isDarkMode ? '#1E1E1E' : '#FFFFFF'
+            }}
+            title="Python ML Notebook"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+          />
+        )}
+      </div>
+    </div>
+  )
+})
 
 const LoadingSpinner = ({ theme }) => (
   <div style={{
@@ -578,6 +985,7 @@ function AppContent() {
   const [selectedLanguage, setSelectedLanguage] = useState('python')
   const [code, setCode] = useState('')
   const [partCodes, setPartCodes] = useState({}) // Store code for each part: { 0: 'code1', 1: 'code2', ... }
+  const [submittedParts, setSubmittedParts] = useState({}) // Track which parts have been submitted: { 0: true, 1: true, ... }
   const [result, setResult] = useState(null)
   const [isDarkMode, setIsDarkMode] = useState(() => {
     // Load dark mode preference from localStorage
@@ -605,6 +1013,51 @@ function AppContent() {
     parts: [] // Array of parts for multi-part questions (Part 2, Part 3, etc.)
   })
   const [isFullscreen, setIsFullscreen] = useState(false)
+  
+  // Search and sort state
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortField, setSortField] = useState('none') // 'none', 'name', 'type'
+  const [sortDirection, setSortDirection] = useState('asc') // 'asc', 'desc'
+  
+  // Memoized filtered and sorted problems list
+  // Uses optimized algorithms:
+  // - Search: O(n) case-insensitive substring matching
+  // - Sort: JavaScript's Timsort algorithm O(n log n)
+  const filteredAndSortedProblems = useMemo(() => {
+    let result = [...problems]
+    
+    // Filter by search query (case-insensitive substring match)
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim()
+      result = result.filter(problem => {
+        const title = (problem.Title || problem.title || '').toLowerCase()
+        const type = (problem.Type || problem.type || 'coding').toLowerCase()
+        // Search in both title and type
+        return title.includes(query) || type.includes(query)
+      })
+    }
+    
+    // Sort by field if specified
+    if (sortField !== 'none') {
+      result.sort((a, b) => {
+        let valueA, valueB
+        
+        if (sortField === 'name') {
+          valueA = (a.Title || a.title || '').toLowerCase()
+          valueB = (b.Title || b.title || '').toLowerCase()
+        } else if (sortField === 'type') {
+          valueA = (a.Type || a.type || 'coding').toLowerCase()
+          valueB = (b.Type || b.type || 'coding').toLowerCase()
+        }
+        
+        // Use localeCompare for proper string comparison
+        const comparison = valueA.localeCompare(valueB)
+        return sortDirection === 'asc' ? comparison : -comparison
+      })
+    }
+    
+    return result
+  }, [problems, searchQuery, sortField, sortDirection])
   
   // Save system design drawing to backend
   const saveSystemDesignDrawing = async (problemId, drawingData) => {
@@ -1205,6 +1658,18 @@ function AppContent() {
       return
     }
 
+    // Validate that API key is provided
+    if (!agentRequest.apiKey || agentRequest.apiKey.trim() === '') {
+      const providerName = agentRequest.provider === 'gemini' ? 'Gemini' : 
+                          agentRequest.provider === 'openai' ? 'OpenAI' : 'Claude'
+      alert(`Please enter your ${providerName} API key to generate questions.\n\nYou can get a free API key from:\n${
+        agentRequest.provider === 'gemini' ? '• Google AI Studio: https://aistudio.google.com/app/apikey' :
+        agentRequest.provider === 'openai' ? '• OpenAI Platform: https://platform.openai.com/api-keys' :
+        '• Anthropic Console: https://console.anthropic.com/settings/keys'
+      }`)
+      return
+    }
+
     // Ensure count is valid
     const count = agentRequest.count && !isNaN(parseInt(agentRequest.count)) ? parseInt(agentRequest.count) : 3
     const questionCount = Math.max(1, Math.min(10, count))
@@ -1778,7 +2243,7 @@ function AppContent() {
         ...prev,
         [selectedPart]: newCode || ''
       }))
-    }
+      }
   }
 
   const handleSmartBackspace = (e) => {
@@ -3558,6 +4023,7 @@ function AppContent() {
     if (!selectedProblem) {
       setSelectedPart(0)
       setPartCodes({})
+      setSubmittedParts({})
       return
     }
 
@@ -3580,6 +4046,7 @@ function AppContent() {
         // Reset part selection when problem changes
         setSelectedPart(0)
         setPartCodes({})
+        setSubmittedParts({})
 
         // Update language and code based on problem
         const firstLanguage = problem.Languages && problem.Languages[0] ? problem.Languages[0] : 'python'
@@ -3610,7 +4077,7 @@ function AppContent() {
     fetchProblemDetails()
   }, [selectedProblem])
 
-  // Handle part switching - load code for the selected part
+  // Handle part switching - load code for the selected part with carry-over from previous part
   useEffect(() => {
     if (!selectedProblem) return
 
@@ -3618,18 +4085,31 @@ function AppContent() {
     const parts = selectedProblem.Parts || selectedProblem.parts || []
 
     if (isMultiPart && parts.length > 0) {
-      // Load code for the selected part
-      if (selectedPart === 0) {
-        // Main part - use problem stub
+      // Check if we already have code for this part
+      if (partCodes[selectedPart] !== undefined && partCodes[selectedPart] !== '') {
+        // Use existing code for this part
+        setCode(partCodes[selectedPart])
+      } else if (selectedPart > 0 && partCodes[selectedPart - 1] !== undefined && partCodes[selectedPart - 1] !== '') {
+        // Carry over code from the previous part (for parts 2, 3, etc.)
+        // This creates the dependency chain: part 2 builds on part 1, part 3 builds on part 2, etc.
+        const previousCode = partCodes[selectedPart - 1]
+        setCode(previousCode)
+        // Also save this as the starting code for the current part
+        setPartCodes(prev => ({
+          ...prev,
+          [selectedPart]: previousCode
+        }))
+      } else if (selectedPart === 0) {
+        // Main part (Part 1) - use problem stub
         let stubCode = ''
         if (selectedProblem.Stub && selectedProblem.Stub[selectedLanguage]) {
           stubCode = selectedProblem.Stub[selectedLanguage]
         } else {
           stubCode = getDefaultStubForLanguage(selectedLanguage)
         }
-        setCode(partCodes[0] || stubCode)
+        setCode(stubCode)
       } else {
-        // Additional part - use part stub
+        // Fallback for additional parts without previous code - use part stub
         const part = parts[selectedPart - 1]
         const partStub = part.stub || part.Stub || {}
         let stubCode = ''
@@ -3638,7 +4118,7 @@ function AppContent() {
         } else {
           stubCode = getDefaultStubForLanguage(selectedLanguage)
         }
-        setCode(partCodes[selectedPart] || stubCode)
+        setCode(stubCode)
       }
     }
   }, [selectedPart, selectedLanguage, selectedProblem])
@@ -3649,6 +4129,11 @@ function AppContent() {
     setIsSubmittingCode(true)
     setResult(null)
     setError(null)
+
+    const isMultiPart = selectedProblem.IsMultiPart || selectedProblem.isMultiPart
+    const parts = selectedProblem.Parts || selectedProblem.parts || []
+    const totalParts = parts.length + 1
+    const isLastPart = selectedPart >= totalParts - 1
 
     try {
       let files = {}
@@ -3678,10 +4163,43 @@ function AppContent() {
       const result = await response.json()
       setResult(result)
 
+      // Mark this part as submitted
+      setSubmittedParts(prev => ({
+        ...prev,
+        [selectedPart]: true
+      }))
+
       if (result.verdict === 'Accepted') {
+        if (isMultiPart && parts.length > 0) {
+          if (isLastPart) {
+            // All parts completed
+            alert(`🎉 Congratulations! All ${totalParts} parts submitted successfully!`)
+          } else {
+            // Move to next part with code carry-over
+            const currentCode = code
+            const nextPart = selectedPart + 1
+            
+            // Save current code and pre-fill next part with current code
+            setPartCodes(prev => ({
+              ...prev,
+              [selectedPart]: currentCode,
+              [nextPart]: currentCode // Carry over code to the next part
+            }))
+            
+            alert(`✓ Part ${selectedPart + 1} submitted! Moving to Part ${nextPart + 1}...`)
+            
+            // Move to next part
+            setSelectedPart(nextPart)
+          }
+        } else {
         alert('Code submitted successfully!')
+        }
+      } else {
+        if (isMultiPart && parts.length > 0) {
+          alert(`Part ${selectedPart + 1} submission completed. Check the results for details.`)
       } else {
         alert('Submission completed. Check the results for details.')
+        }
       }
     } catch (err) {
       console.error('Submit failed:', err)
@@ -4874,16 +5392,17 @@ function AppContent() {
                   fontSize: '14px',
                   fontWeight: '600'
                 }}>
-                  API Key {agentRequest.provider === 'gemini' ? '(Optional - uses env var if not provided)' : '(Required)'}
+                  API Key <span style={{ color: '#EF4444' }}>*</span>
                 </label>
                 <input
                   type="password"
                   value={agentRequest.apiKey}
                   onChange={(e) => setAgentRequest({...agentRequest, apiKey: e.target.value})}
+                  required
                   style={{
                     width: '100%',
                     padding: '12px 16px',
-                    border: `1px solid ${theme.border}`,
+                    border: `1px solid ${!agentRequest.apiKey ? '#EF4444' : theme.border}`,
                     borderRadius: '8px',
                     backgroundColor: theme.background,
                     color: theme.text,
@@ -4891,7 +5410,7 @@ function AppContent() {
                     transition: 'border-color 0.2s ease'
                   }}
                   onFocus={(e) => e.target.style.borderColor = theme.primary}
-                  onBlur={(e) => e.target.style.borderColor = theme.border}
+                  onBlur={(e) => e.target.style.borderColor = !agentRequest.apiKey ? '#EF4444' : theme.border}
                   placeholder={`Enter your ${agentRequest.provider === 'gemini' ? 'Gemini' : agentRequest.provider === 'openai' ? 'OpenAI' : 'Claude'} API key...`}
                 />
                 <p style={{
@@ -4900,9 +5419,7 @@ function AppContent() {
                   fontSize: '12px',
                   lineHeight: '1.4'
                 }}>
-                  {agentRequest.provider === 'gemini' && 'Get your key from '}
-                  {agentRequest.provider === 'openai' && 'Get your key from '}
-                  {agentRequest.provider === 'claude' && 'Get your key from '}
+                  🔑 Required. Get your free key from{' '}
                   {agentRequest.provider === 'gemini' && <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style={{ color: theme.primary }}>Google AI Studio</a>}
                   {agentRequest.provider === 'openai' && <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" style={{ color: theme.primary }}>OpenAI Platform</a>}
                   {agentRequest.provider === 'claude' && <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer" style={{ color: theme.primary }}>Anthropic Console</a>}
@@ -5303,6 +5820,165 @@ function AppContent() {
                 </button>
               </div>
             </div>
+            
+            {/* Search and Sort Controls */}
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+              marginBottom: '12px',
+              padding: '0 4px'
+            }}>
+              {/* Search Input */}
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search problems..."
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px 8px 32px',
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: '6px',
+                    backgroundColor: theme.surface,
+                    color: theme.text,
+                    fontSize: '13px',
+                    outline: 'none',
+                    transition: 'border-color 0.2s ease',
+                    boxSizing: 'border-box'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = theme.primary}
+                  onBlur={(e) => e.target.style.borderColor = theme.border}
+                />
+                <span style={{
+                  position: 'absolute',
+                  left: '10px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: theme.textSecondary,
+                  fontSize: '14px',
+                  pointerEvents: 'none'
+                }}>🔍</span>
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    style={{
+                      position: 'absolute',
+                      right: '8px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      color: theme.textSecondary,
+                      cursor: 'pointer',
+                      padding: '2px 6px',
+                      fontSize: '12px',
+                      borderRadius: '4px'
+                    }}
+                    onMouseEnter={(e) => e.target.style.color = theme.text}
+                    onMouseLeave={(e) => e.target.style.color = theme.textSecondary}
+                    title="Clear search"
+                  >✕</button>
+                )}
+              </div>
+              
+              {/* Sort Controls */}
+              <div style={{
+                display: 'flex',
+                gap: '8px',
+                alignItems: 'center'
+              }}>
+                <select
+                  value={sortField}
+                  onChange={(e) => setSortField(e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: '6px 8px',
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: '6px',
+                    backgroundColor: theme.surface,
+                    color: theme.text,
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    outline: 'none'
+                  }}
+                >
+                  <option value="none">Sort by...</option>
+                  <option value="name">Name</option>
+                  <option value="type">Type</option>
+                </select>
+                
+                {sortField !== 'none' && (
+                  <button
+                    onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')}
+                    style={{
+                      padding: '6px 10px',
+                      border: `1px solid ${theme.border}`,
+                      borderRadius: '6px',
+                      backgroundColor: theme.surface,
+                      color: theme.text,
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = theme.border}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = theme.surface}
+                    title={sortDirection === 'asc' ? 'Ascending (A-Z)' : 'Descending (Z-A)'}
+                  >
+                    {sortDirection === 'asc' ? '↑ A-Z' : '↓ Z-A'}
+                  </button>
+                )}
+                
+                {(searchQuery || sortField !== 'none') && (
+                  <button
+                    onClick={() => {
+                      setSearchQuery('')
+                      setSortField('none')
+                      setSortDirection('asc')
+                    }}
+                    style={{
+                      padding: '6px 8px',
+                      border: `1px solid ${theme.border}`,
+                      borderRadius: '6px',
+                      backgroundColor: 'transparent',
+                      color: theme.textSecondary,
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = theme.surface
+                      e.target.style.color = theme.text
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = 'transparent'
+                      e.target.style.color = theme.textSecondary
+                    }}
+                    title="Clear all filters"
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
+              
+              {/* Results count */}
+              {(searchQuery || sortField !== 'none') && (
+                <div style={{
+                  fontSize: '11px',
+                  color: theme.textSecondary,
+                  paddingLeft: '4px'
+                }}>
+                  {filteredAndSortedProblems.length} of {problems.length} problems
+                  {searchQuery && ` matching "${searchQuery}"`}
+                  {sortField !== 'none' && ` • Sorted by ${sortField}`}
+                </div>
+              )}
+            </div>
+            
             {isLoadingProblems ? (
               <div style={{ textAlign: 'center', padding: '20px' }}>
                 <LoadingSpinner theme={theme} />
@@ -5310,9 +5986,46 @@ function AppContent() {
                   Loading problems...
                 </p>
               </div>
+            ) : filteredAndSortedProblems.length === 0 ? (
+              <div style={{ 
+                textAlign: 'center', 
+                padding: '30px 20px',
+                color: theme.textSecondary
+              }}>
+                {searchQuery ? (
+                  <>
+                    <div style={{ fontSize: '32px', marginBottom: '12px' }}>🔍</div>
+                    <p style={{ margin: 0, fontSize: '14px' }}>
+                      No problems found matching "{searchQuery}"
+                    </p>
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      style={{
+                        marginTop: '12px',
+                        padding: '6px 12px',
+                        backgroundColor: theme.primary,
+                        color: '#FFFFFF',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '12px'
+                      }}
+                    >
+                      Clear Search
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ fontSize: '32px', marginBottom: '12px' }}>📝</div>
+                    <p style={{ margin: 0, fontSize: '14px' }}>
+                      No problems available
+                    </p>
+                  </>
+                )}
+              </div>
             ) : (
               <div>
-                {problems.map(problem => {
+                {filteredAndSortedProblems.map(problem => {
                   // Handle both uppercase and lowercase field names
                   const problemID = problem.ID || problem.id
                   const problemTitle = problem.Title || problem.title
@@ -5707,16 +6420,16 @@ function AppContent() {
                               style={{
                                 padding: '4px 8px',
                                 fontSize: '11px',
-                                backgroundColor: selectedPart === 0 ? theme.primary : theme.surface,
-                                color: selectedPart === 0 ? '#FFFFFF' : theme.text,
-                                border: `1px solid ${selectedPart === 0 ? theme.primary : theme.border}`,
+                                backgroundColor: submittedParts[0] ? theme.success : (selectedPart === 0 ? theme.primary : theme.surface),
+                                color: submittedParts[0] || selectedPart === 0 ? '#FFFFFF' : theme.text,
+                                border: `1px solid ${submittedParts[0] ? theme.success : (selectedPart === 0 ? theme.primary : theme.border)}`,
                                 borderRadius: '4px',
                                 cursor: 'pointer',
                                 fontWeight: selectedPart === 0 ? '600' : '400',
                                 transition: 'all 0.2s ease'
                               }}
                             >
-                              Part 1
+                              {submittedParts[0] ? '✓ ' : ''}Part 1
                             </button>
                             {parts.map((part, idx) => (
                               <button
@@ -5725,16 +6438,16 @@ function AppContent() {
                                 style={{
                                   padding: '4px 8px',
                                   fontSize: '11px',
-                                  backgroundColor: selectedPart === idx + 1 ? theme.primary : theme.surface,
-                                  color: selectedPart === idx + 1 ? '#FFFFFF' : theme.text,
-                                  border: `1px solid ${selectedPart === idx + 1 ? theme.primary : theme.border}`,
+                                  backgroundColor: submittedParts[idx + 1] ? theme.success : (selectedPart === idx + 1 ? theme.primary : theme.surface),
+                                  color: submittedParts[idx + 1] || selectedPart === idx + 1 ? '#FFFFFF' : theme.text,
+                                  border: `1px solid ${submittedParts[idx + 1] ? theme.success : (selectedPart === idx + 1 ? theme.primary : theme.border)}`,
                                   borderRadius: '4px',
                                   cursor: 'pointer',
                                   fontWeight: selectedPart === idx + 1 ? '600' : '400',
                                   transition: 'all 0.2s ease'
                                 }}
                               >
-                                Part {part.partNumber}
+                                {submittedParts[idx + 1] ? '✓ ' : ''}Part {part.partNumber}
                               </button>
                             ))}
                           </div>
@@ -6046,7 +6759,28 @@ function AppContent() {
                             gap: '4px'
                         }}
                       >
-                          {isSubmittingCode ? 'Submitting...' : <><span>✓</span>Submit</>}
+                          {(() => {
+                            if (isSubmittingCode) return 'Submitting...'
+                            
+                            const isMultiPart = selectedProblem && (selectedProblem.IsMultiPart || selectedProblem.isMultiPart)
+                            const parts = selectedProblem && (selectedProblem.Parts || selectedProblem.parts || [])
+                            
+                            if (isMultiPart && parts.length > 0) {
+                              const totalParts = parts.length + 1
+                              const isLastPart = selectedPart >= totalParts - 1
+                              const isPartSubmitted = submittedParts[selectedPart]
+                              
+                              if (isPartSubmitted) {
+                                return <><span>✓</span>Part {selectedPart + 1} Submitted</>
+                              } else if (isLastPart) {
+                                return <><span>✓</span>Submit Final Part</>
+                              } else {
+                                return <><span>→</span>Submit Part {selectedPart + 1} & Continue</>
+                              }
+                            }
+                            
+                            return <><span>✓</span>Submit</>
+                          })()}
                       </button>
                     </div>
                   </div>
@@ -6306,11 +7040,26 @@ function AppContent() {
                             theme={theme}
                             isDarkMode={isDarkMode}
                           />
-                        </div>
-                      </div>
-                    )}
-              </div>
-              ) : (
+                                </div>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                /* JupyterLite ML Notebook Mode */
+                <div style={{
+                    width: `${100 - leftPaneWidth}%`,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    backgroundColor: theme.background,
+                    overflow: 'hidden',
+                    minWidth: '300px'
+                }}>
+                  <JupyterLiteNotebook isDarkMode={isDarkMode} theme={theme} />
+                            </div>
+                          )}
+              
+              {/* Legacy Jupyter UI - Hidden but kept for backwards compatibility */}
+              {false && (
                 <div style={{
                     width: `${100 - leftPaneWidth}%`,
                     display: 'flex',
@@ -6333,7 +7082,7 @@ function AppContent() {
                         fontSize: '14px',
                       fontWeight: '600'
                     }}>
-                      Jupyter Notebook
+                      Legacy Jupyter Notebook
                     </h4>
                       <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                       <select

@@ -1,0 +1,24 @@
+{
+  "ID": "reddit-word-ladder",
+  "Title": "Reddit Word Ladder",
+  "Statement": "A transformation sequence from word beginWord to word endWord using a dictionary wordList is a sequence of words beginWord -\u003e s1 -\u003e s2 -\u003e ... -\u003e sk such that:\n\nEvery adjacent pair of words differs by a single letter.\nEvery si for 1 \u003c= i \u003c= k is in wordList. Note that beginWord does not need to be in wordList.\nsk == endWord\nGiven two words, beginWord and endWord, and a dictionary wordList, return the number of words in the shortest transformation sequence from beginWord to endWord, or 0 if no such sequence exists.\n\n \n\nExample 1:\n\nInput: beginWord = \"hit\", endWord = \"cog\", wordList = [\"hot\",\"dot\",\"dog\",\"lot\",\"log\",\"cog\"]\nOutput: 5\nExplanation: One shortest transformation sequence is \"hit\" -\u003e \"hot\" -\u003e \"dot\" -\u003e \"dog\" -\u003e cog\", which is 5 words long.\nExample 2:\n\nInput: beginWord = \"hit\", endWord = \"cog\", wordList = [\"hot\",\"dot\",\"dog\",\"lot\",\"log\"]\nOutput: 0\nExplanation: The endWord \"cog\" is not in wordList, therefore there is no valid transformation sequence.\n \n\nConstraints:\n\n1 \u003c= beginWord.length \u003c= 10\nendWord.length == beginWord.length\n1 \u003c= wordList.length \u003c= 5000\nwordList[i].length == beginWord.length\nbeginWord, endWord, and wordList[i] consist of lowercase English letters.\nbeginWord != endWord\nAll the words in wordList are unique.",
+  "Languages": [
+    "python",
+    "cpp",
+    "java",
+    "kotlin",
+    "go"
+  ],
+  "Stub": {
+    "python": ""
+  },
+  "Type": "coding",
+  "IsMultiPart": true,
+  "Parts": [
+    {
+      "partNumber": 2,
+      "statement": "A transformation sequence from word beginWord to word endWord using a dictionary wordList is a sequence of words beginWord -\u003e s1 -\u003e s2 -\u003e ... -\u003e sk such that:\n\nEvery adjacent pair of words differs by a single letter.\nEvery si for 1 \u003c= i \u003c= k is in wordList. Note that beginWord does not need to be in wordList.\nsk == endWord\nGiven two words, beginWord and endWord, and a dictionary wordList, return all the shortest transformation sequences from beginWord to endWord, or an empty list if no such sequence exists. Each sequence should be returned as a list of the words [beginWord, s1, s2, ..., sk].\n\n \n\nExample 1:\n\nInput: beginWord = \"hit\", endWord = \"cog\", wordList = [\"hot\",\"dot\",\"dog\",\"lot\",\"log\",\"cog\"]\nOutput: [[\"hit\",\"hot\",\"dot\",\"dog\",\"cog\"],[\"hit\",\"hot\",\"lot\",\"log\",\"cog\"]]\nExplanation: There are 2 shortest transformation sequences:\n\"hit\" -\u003e \"hot\" -\u003e \"dot\" -\u003e \"dog\" -\u003e \"cog\"\n\"hit\" -\u003e \"hot\" -\u003e \"lot\" -\u003e \"log\" -\u003e \"cog\"\nExample 2:\n\nInput: beginWord = \"hit\", endWord = \"cog\", wordList = [\"hot\",\"dot\",\"dog\",\"lot\",\"log\"]\nOutput: []\nExplanation: The endWord \"cog\" is not in wordList, therefore there is no valid transformation sequence.\n \n\nConstraints:\n\n1 \u003c= beginWord.length \u003c= 5\nendWord.length == beginWord.length\n1 \u003c= wordList.length \u003c= 500\nwordList[i].length == beginWord.length\nbeginWord, endWord, and wordList[i] consist of lowercase English letters.\nbeginWord != endWord\nAll the words in wordList are unique.\nThe sum of all shortest transformation sequences does not exceed 105.",
+      "stub": {}
+    }
+  ]
+}

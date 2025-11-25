@@ -2,6 +2,81 @@
 
 ## Recent Updates
 
+### Version 1.8.0 - Interactive Terminal & ML Notebook
+
+#### ✨ New Features
+
+1. **Fully Interactive Terminal**
+   - Real-time WebSocket-based terminal
+   - Full PTY (pseudo-terminal) support
+   - ANSI color and escape code support
+   - Terminal resize handling
+   - Toggle between Output and Terminal modes
+   - Run any shell command in the browser
+
+2. **ML Notebook with Pyodide**
+   - Browser-based Python environment (no server needed)
+   - Pre-loaded packages: numpy, pandas, scikit-learn, matplotlib
+   - Jupyter-style cell execution with Shift+Enter
+   - Inline plot rendering
+   - Install additional packages via micropip
+   - Option to open full JupyterLite
+
+#### 🔧 Improvements
+
+1. **Backend Enhancements**
+   - Added WebSocket endpoint for terminal
+   - PTY support via github.com/creack/pty
+   - Gorilla WebSocket for connection handling
+   - Session management for terminal connections
+
+2. **Frontend Enhancements**
+   - New InteractiveTerminal component
+   - JupyterLiteNotebook component with Pyodide
+   - Terminal mode toggle in Output panel
+   - Improved xterm.js integration
+
+#### 🐛 Bug Fixes
+
+1. **Terminal**
+   - Proper cleanup on disconnect
+   - Resize message handling
+   - Connection status indicators
+
+---
+
+### Version 1.7.0 - Problem Search and Sort
+
+#### ✨ New Features
+
+1. **Problem Search**
+   - Real-time search as you type
+   - Case-insensitive matching on problem title and type
+   - Clear button to reset search
+   - "No results" message with clear option
+
+2. **Problem Sorting**
+   - Sort by problem name (alphabetical)
+   - Sort by problem type (coding/system_design)
+   - Toggle ascending/descending order
+   - Reset button to clear all filters
+
+#### 🔧 Improvements
+
+1. **Performance Optimization**
+   - Search uses O(n) substring matching
+   - Sort uses Timsort algorithm O(n log n)
+   - Results memoized with useMemo
+   - Only recomputes when filters change
+
+2. **UI Enhancements**
+   - Search icon and clear button
+   - Sort dropdown with intuitive options
+   - Direction toggle button (↑ A-Z / ↓ Z-A)
+   - Results count showing filtered/total problems
+
+---
+
 ### Version 1.6.0 - Multi-Part Coding Questions
 
 #### ✨ New Features

@@ -1,0 +1,22 @@
+{
+  "ID": "reddit-software engineer-senior-subreddit-recommendation-overlap",
+  "Title": "Subreddit Recommendation based on User Overlap",
+  "Statement": "Implement a function `recommend_subreddits(user_id, all_user_subreddit_follows, k, min_common_subreddits)` that suggests `k` new subreddits for a given `user_id`. The recommendation logic is as follows:\n\n1.  For each other user `U_other` (not `user_id`), calculate the number of common subreddits they share with the target `user_id`.\n2.  Filter `U_other` users: only consider those who share at least `min_common_subreddits` (default to 2) with `user_id`. These are 'similar users'.\n3.  From these similar users, collect all subreddits they follow that `user_id` *does not* already follow. These are candidate recommendations.\n4.  Rank these candidate subreddits by how many *unique* similar users follow them. Return the top `k` subreddits. If counts are tied, sort alphabetically by subreddit ID.\n\n**Input:**\n*   `user_id`: The ID of the user for whom to generate recommendations.\n*   `all_user_subreddit_follows`: A dictionary/map where keys are user IDs and values are sets/lists of subreddit IDs they follow.\n*   `k`: The maximum number of recommendations to return.\n*   `min_common_subreddits`: The minimum number of shared subreddits required for another user to be considered 'similar'. Defaults to `2`.\n\n**Output:** A list of `subreddit_id` strings, sorted by popularity among similar users (descending count), then alphabetically (ascending) for ties.\n\n**Example:**\n```\nfollows = {\n    \"Alice\": {\"r/tech\", \"r/science\", \"r/programming\"},\n    \"Bob\": {\"r/science\", \"r/programming\", \"r/gaming\"},\n    \"Charlie\": {\"r/programming\", \"r/gaming\", \"r/music\"},\n    \"David\": {\"r/tech\", \"r/science\", \"r/memes\"},\n}\n\n# Target user: Alice (follows: {r/tech, r/science, r/programming})\n# min_common_subreddits = 2\n\n# Compare Alice with Bob:\n# Common: {\"r/science\", \"r/programming\"} (count: 2) -\u003e Bob is similar.\n# Bob follows \"r/gaming\" which Alice doesn't. Candidate: r/gaming\n\n# Compare Alice with Charlie:\n# Common: {\"r/programming\"} (count: 1) -\u003e Charlie is NOT similar.\n\n# Compare Alice with David:\n# Common: {\"r/tech\", \"r/science\"} (count: 2) -\u003e David is similar.\n# David follows \"r/memes\" which Alice doesn't. Candidate: r/memes\n\n# Candidate recommendations and their counts:\n# r/gaming: 1 (from Bob)\n# r/memes: 1 (from David)\n\nrecommend_subreddits(\"Alice\", follows, k=2, min_common_subreddits=2) == [\"r/gaming\", \"r/memes\"] # Sorted alphabetically due to tied counts\n```",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {
+    "cpp": "#include \u003cstring\u003e\n#include \u003cvector\u003e\n#include \u003cunordered_map\u003e\n#include \u003cunordered_set\u003e\n#include \u003calgorithm\u003e\n#include \u003cqueue\u003e\n\nclass Solution {\npublic:\n    std::vector\u003cstd::string\u003e recommendSubreddits(const std::string\u0026 user_id, const std::unordered_map\u003cstd::string, std::unordered_set\u003cstd::string\u003e\u003e\u0026 all_user_subreddit_follows, int k, int min_common_subreddits = 2) {\n        // Your code here\n        return {};\n    }\n};",
+    "go": "package main\n\nfunc RecommendSubreddits(userId string, allUserSubredditFollows map[string][]string, k int, minCommonSubreddits int) []string {\n    // Your code here\n    return []string{}\n}",
+    "java": "import java.util.*;\n\nclass Solution {\n    public List\u003cString\u003e recommendSubreddits(String userId, Map\u003cString, Set\u003cString\u003e\u003e allUserSubredditFollows, int k, int minCommonSubreddits) {\n        // Your code here\n        return new ArrayList\u003c\u003e();\n    }\n}",
+    "javascript": "function recommendSubreddits(userId, allUserSubredditFollows, k, minCommonSubreddits = 2) {\n    // Your code here\n    return [];\n}",
+    "python": "def recommend_subreddits(user_id: str, all_user_subreddit_follows: dict, k: int, min_common_subreddits: int = 2) -\u003e list:\n    # Your code here\n    pass",
+    "rust": "use std::collections::{HashMap, HashSet};\n\npub fn recommend_subreddits(user_id: \u0026str, all_user_subreddit_follows: \u0026HashMap\u003cString, HashSet\u003cString\u003e\u003e, k: usize, min_common_subreddits: usize) -\u003e Vec\u003cString\u003e {\n    // Your code here\n    vec![]\n}"
+  },
+  "Type": "coding"
+}

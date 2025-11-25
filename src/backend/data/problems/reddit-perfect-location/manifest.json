@@ -1,0 +1,16 @@
+{
+  "ID": "reddit-perfect-location",
+  "Title": "Reddit Perfect Location",
+  "Statement": "Reddit is so successful online, that it has decided to open an offline kiosk for people to get their physical front page of the internet - now we just need to decide where to build it. \nFortunately we have already located the perfect city to put our first test kiosk, and like all cities, it happens to be a perfect grid. We also happen to know the locations of all of our happy customers as intersections on the grid. Given this customer data, what is the best place to put our kiosk?\n\nHere is an ascii grid demonstrating this problem. Streets are lines, and locations of customers are smiley faces. The asterisk is an example place for a kiosk on the grid.\n\n   0  1  2  3  4  5  6  7  8\n  0+--+--+--+--+--+--+--+--+\n   |  |  |  |  |  |  |  |  |\n  1+--+--+--+--+--+--+--+--+\n   |  |  |  |  |  |  |  |  |\n  2+--+--☻--+--+--+--+--☻--+\n   |  |  |  |  |  |  |  |  |\n  3+--+--+--+--☻--+--+--+--+\n   |  |  |  |  |  |  |  |  |\n  4+--+--+--+--+-[*]-+--+--+\n   |  |  |  |  |  |  |  |  |\n  5+--+--+--☻--+--+--+--+--+\n   |  |  |  |  |  |  |  |  |\n  6+--+--+--+--+--+--+--+--+\n   |  |  |  |  |  |  |  |  |\n  7+--+--☻--+--+--+--+--+--+\n   |  |  |  |  |  |  |  |  |\n  8+--+--+--+--+--+--+--+--+\nInput 1 (locations):\n{(2,2), (7,2), (4,3), (3,5), (2,7)}\n\nOutput 1 (any optimal location):\n(3,3)\n\nInput 2 (locations):\n[(2, 2), (7, 2), (3, 4), (3, 5), (2, 7)]\n\nOutput 2 (any optimal location):\n(4,3)\n\nNote: there might be more than one optimal solutions, your program can return any one of them.\n",
+  "Languages": [
+    "python",
+    "cpp",
+    "java",
+    "kotlin",
+    "go"
+  ],
+  "Stub": {
+    "python": ""
+  },
+  "Type": "coding"
+}

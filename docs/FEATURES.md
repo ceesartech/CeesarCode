@@ -6,7 +6,94 @@ This document provides a comprehensive overview of all features in CeesarCode, i
 
 ---
 
-## ✨ Latest Features (v1.6.0)
+## ✨ Latest Features (v1.8.0)
+
+### 1. Fully Interactive Terminal
+
+**Description**: Real-time interactive terminal with full shell access via WebSocket.
+
+**Features**:
+- Full PTY (pseudo-terminal) support for true shell experience
+- WebSocket-based real-time bidirectional communication
+- ANSI color support and terminal resizing
+- Run any shell command directly in the browser
+- Persistent session with automatic reconnection
+- Toggle between Output mode and Terminal mode
+
+**Technical Implementation**:
+- Backend uses `github.com/creack/pty` for PTY support
+- WebSocket endpoint at `/api/terminal/ws`
+- Frontend uses xterm.js with WebSocket connection
+- Automatic terminal resize handling
+
+**Usage**:
+1. In the Output panel, click "💻 Terminal" to switch to interactive mode
+2. Type commands and see real-time output
+3. Use standard terminal shortcuts (Ctrl+C, Ctrl+D, etc.)
+4. Click "📤 Output" to switch back to code output mode
+
+---
+
+### 2. ML Notebook with Pyodide
+
+**Description**: Browser-based Python notebook powered by Pyodide (Python in WebAssembly).
+
+**Features**:
+- Full Python environment running in the browser
+- Pre-loaded ML packages: numpy, pandas, scikit-learn, matplotlib, scipy
+- Jupyter-style cell execution with Shift+Enter
+- Inline plot rendering with matplotlib
+- Install additional packages via micropip
+- No server-side Python required
+
+**Available Packages**:
+- numpy - Numerical computing
+- pandas - Data manipulation
+- scikit-learn - Machine learning
+- matplotlib - Visualization
+- scipy - Scientific computing
+- sympy - Symbolic mathematics
+- networkx - Graph algorithms
+- Additional packages via `micropip.install()`
+
+**Usage**:
+1. Click "Jupyter Mode" to switch to notebook mode
+2. Write Python code in cells
+3. Press Shift+Enter or click "Run" to execute
+4. View output and plots inline
+5. Add new cells with "+ Add Cell"
+6. Click "Open JupyterLite" for full JupyterLab experience
+
+---
+
+## ✨ Previous Features (v1.7.0)
+
+### 1. Problem Search and Sort
+
+**Description**: Search and sort problems in the sidebar with optimal algorithms for fast performance.
+
+**Features**:
+- **Search**: Case-insensitive search across problem titles and types
+- **Sort by Name**: Alphabetical sorting (A-Z or Z-A)
+- **Sort by Type**: Group problems by type (coding vs system_design)
+- **Toggle Direction**: Switch between ascending and descending order
+- **Reset**: Clear all filters with one click
+- **Results Count**: Shows filtered vs total problems count
+
+**Technical Implementation**:
+- Search uses O(n) case-insensitive substring matching
+- Sort uses JavaScript's Timsort algorithm - O(n log n) optimal comparison-based sorting
+- Results memoized with `useMemo` for performance - only recomputes when filters change
+
+**Usage**:
+1. Type in the search box to filter problems
+2. Use the "Sort by..." dropdown to select sort field (Name or Type)
+3. Click the direction button (↑ A-Z / ↓ Z-A) to toggle order
+4. Click "Reset" to clear all filters
+
+---
+
+## ✨ Previous Features (v1.6.0)
 
 ### 1. Multi-Part Coding Questions
 

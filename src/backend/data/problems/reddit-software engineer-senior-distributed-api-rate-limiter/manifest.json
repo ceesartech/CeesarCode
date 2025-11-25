@@ -1,0 +1,40 @@
+{
+  "ID": "reddit-software engineer-senior-distributed-api-rate-limiter",
+  "Title": "Distributed API Rate Limiter",
+  "Statement": "Rate limiting is crucial for preventing abuse and ensuring fair resource usage in large-scale web services like Reddit. This problem explores different rate limiting strategies.",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {
+    "cpp": "#include \u003cstring\u003e\n#include \u003cchrono\u003e\n#include \u003cmap\u003e\n#include \u003cdeque\u003e\n\nclass RateLimiter {\npublic:\n    RateLimiter(int max_requests, int time_window_seconds) {\n        // Your code here\n    }\n\n    bool allowRequest(const std::string\u0026 user_id, long long current_timestamp) {\n        // Your code here\n        return false;\n    }\n};",
+    "go": "package main\n\ntype RateLimiter struct {\n    // Your fields here\n}\n\nfunc NewRateLimiter(maxRequests int, timeWindowSeconds int) *RateLimiter {\n    // Your code here\n    return \u0026RateLimiter{}\n}\n\nfunc (rl *RateLimiter) AllowRequest(userId string, currentTimestamp int64) bool {\n    // Your code here\n    return false\n}",
+    "java": "import java.util.*;\n\nclass RateLimiter {\n    public RateLimiter(int maxRequests, int timeWindowSeconds) {\n        // Your code here\n    }\n\n    public boolean allowRequest(String userId, long currentTimestamp) {\n        // Your code here\n        return false;\n    }\n}",
+    "javascript": "class RateLimiter {\n    constructor(maxRequests, timeWindowSeconds) {\n        // Your code here\n    }\n\n    allowRequest(userId, currentTimestamp) {\n        // Your code here\n        return false;\n    }\n}",
+    "python": "class RateLimiter:\n    def __init__(self, max_requests: int, time_window_seconds: int):\n        # Your code here\n        pass\n\n    def allow_request(self, user_id: str, current_timestamp: float) -\u003e bool:\n        # Your code here\n        pass",
+    "rust": "use std::collections::{HashMap, VecDeque};\nuse std::time::{Instant, Duration};\n\npub struct RateLimiter {\n    // Your fields here\n}\n\nimpl RateLimiter {\n    pub fn new(max_requests: i32, time_window_seconds: i64) -\u003e Self {\n        // Your code here\n        RateLimiter {}\n    }\n\n    pub fn allow_request(\u0026mut self, user_id: \u0026str, current_timestamp: i64) -\u003e bool {\n        // Your code here\n        false\n    }\n}"
+  },
+  "Type": "coding",
+  "IsMultiPart": true,
+  "Parts": [
+    {
+      "partNumber": 1,
+      "statement": "Implement a `RateLimiter` class using the **Token Bucket** algorithm for a single server instance. Each user should be limited to `max_requests` within a `time_window_seconds`. Tokens refill at a constant `refill_rate_per_second`.\n\n**Class Methods:**\n*   `__init__(self, max_requests: int, time_window_seconds: int, refill_rate_per_second: float)`: Initializes the limiter.\n*   `allow_request(self, user_id: str, current_timestamp: float) -\u003e bool`: Attempts to consume a token for the given user. Returns `True` if allowed, `False` otherwise.\n\n**Example:**\n```\nlimiter = RateLimiter(max_requests=5, time_window_seconds=10, refill_rate_per_second=1.0) # Max 5 req, refills 1 token/sec\n# Assume current_timestamp is 0 initially\nlimiter.allow_request(\"userA\", 0)   # True (tokens: 4)\nlimiter.allow_request(\"userA\", 0.5) # True (tokens: 3)\nlimiter.allow_request(\"userA\", 1.0) # True (tokens: 2. After refill at 1.0, it becomes 3. Then consumed, so 2)\nlimiter.allow_request(\"userA\", 1.1) # True (tokens: 1)\nlimiter.allow_request(\"userA\", 1.2) # True (tokens: 0)\nlimiter.allow_request(\"userA\", 1.3) # False (no tokens)\nlimiter.allow_request(\"userA\", 2.0) # True (At 2.0, 1 token refilled. tokens: 1. Then consumed, so 0)\n```",
+      "stub": null
+    },
+    {
+      "partNumber": 2,
+      "statement": "Re-implement the `RateLimiter` class using the **Sliding Window Counter** algorithm, also for a single server instance. This method tracks timestamps of requests within the window. Reject requests if `max_requests` are exceeded in the current `time_window_seconds`.\n\n**Class Methods:**\n*   `__init__(self, max_requests: int, time_window_seconds: int)`: Initializes the limiter.\n*   `allow_request(self, user_id: str, current_timestamp: float) -\u003e bool`: Records the request and checks the limit. Returns `True` if allowed, `False` otherwise.\n\n**Example:**\n```\nlimiter = RateLimiter(max_requests=3, time_window_seconds=5) # Max 3 req in any 5-second window\n\nlimiter.allow_request(\"userA\", 0)   # True (requests: [0])\nlimiter.allow_request(\"userA\", 1)   # True (requests: [0, 1])\nlimiter.allow_request(\"userA\", 2)   # True (requests: [0, 1, 2])\nlimiter.allow_request(\"userA\", 2.5) # False (would exceed 3 requests in [0, 2.5])\nlimiter.allow_request(\"userA\", 5.1) # True (requests at 0 and 1 are now outside window [0.1, 5.1]. Queue becomes [2]. Add 5.1. Queue: [2, 5.1])\nlimiter.allow_request(\"userA\", 5.5) # True (Queue: [2, 5.1, 5.5])\nlimiter.allow_request(\"userA\", 6.0) # False (would exceed 3 requests in [1, 6.0])\n```",
+      "stub": null
+    },
+    {
+      "partNumber": 3,
+      "statement": "Discuss how you would adapt the **Sliding Window Counter** (from Part 2) to work across multiple distributed instances of the `RateLimiter` service. Provide a simplified stub for the `allow_request` method, demonstrating how it would interact with a shared, consistent storage (e.g., Redis). Focus on the core logic for checking/updating counts in a distributed, eventually consistent manner, and identify potential challenges and mitigation strategies.\n\n**Implementation Focus:**\n*   Your `allow_request` method should outline the steps involved in interacting with a simulated distributed store. You do not need to implement actual network calls, but represent them with comments or placeholder functions.\n*   Explain how to handle potential race conditions when multiple instances try to update the count concurrently.\n*   Discuss trade-offs between consistency and performance in a distributed rate limiter.\n\n**Stub (Python example for illustration):**\n```python\nclass DistributedRateLimiter:\n    def __init__(self, max_requests: int, time_window_seconds: int, redis_client): # Assume redis_client is available\n        self.max_requests = max_requests\n        self.time_window_seconds = time_window_seconds\n        self.redis_client = redis_client\n\n    def allow_request(self, user_id: str, current_timestamp: float) -\u003e bool:\n        key = f\"rate_limiter:{user_id}\"\n        window_start = current_timestamp - self.time_window_seconds\n\n        # --- Simulate distributed operations ---\n        # 1. Atomically remove old timestamps and get current count\n        #    (e.g., using Redis ZREM_RANGE_BY_SCORE and ZCARD or Lua script)\n        #    count = self.redis_client.execute_lua_script_to_prune_and_count(key, window_start, current_timestamp)\n        # 2. Check if count \u003c max_requests\n        # 3. If allowed, atomicaly add current timestamp\n        #    (e.g., using Redis ZADD)\n\n        # Placeholder logic:\n        print(f\"[DISTRIBUTED SIMULATION] User {user_id} at {current_timestamp}\")\n        print(f\"  Simulating call to Redis to prune old requests and get count for key: {key}\")\n        current_request_count_in_window = self.redis_client.get_current_count(key, window_start, current_timestamp)\n\n        if current_request_count_in_window \u003c self.max_requests:\n            print(f\"  Simulating call to Redis to add timestamp {current_timestamp} for key: {key}\")\n            self.redis_client.add_timestamp(key, current_timestamp)\n            return True\n        else:\n            print(f\"  Request denied for {user_id}. Count: {current_request_count_in_window}, Max: {self.max_requests}\")\n            return False\n```",
+      "stub": null
+    }
+  ]
+}

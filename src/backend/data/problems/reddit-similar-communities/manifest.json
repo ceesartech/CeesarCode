@@ -1,0 +1,24 @@
+{
+  "ID": "reddit-similar-communities",
+  "Title": "Reddit Similar Communities",
+  "Statement": "Part 1:\n\nWe have communities with IDs C1,C2,... and followers with IDs F1,F2,..., where each user can follow any of the communities.\n\nWe would like to find “similar” or “related” communities by finding all communities that share followers with the input one, Cx. Implement a function to return all related communities of Cx.\n\nExample:\n\nCommunity -\u003e follower data:\nC1: [F1, F3]\nC2: [F1, F2]\nC3: [F2]\nC4: [F3]\n\n\nFollower -\u003e community data (mirrored data):\nF1: [C1, C2]\nF2: [C2, C3]\nF3: [C1, C4]\n\n\nget_related_communities(C4) -\u003e [C1]\nget_related_communities(C2) -\u003e [C1,C3]\nAssume the data for both maps is pre populated and you can use it for the problem.",
+  "Languages": [
+    "python",
+    "cpp",
+    "java",
+    "kotlin",
+    "go"
+  ],
+  "Stub": {
+    "python": ""
+  },
+  "Type": "coding",
+  "IsMultiPart": true,
+  "Parts": [
+    {
+      "partNumber": 2,
+      "statement": "Part 2:\n\nNow, we want to explore communities which might not share followers directly but are related by indirect relationships (eg. C4 is indirectly related to C2 through C1). Extend the solution to accept degrees of indirect relationship as an input. Each degree adds to the result the communities directly related (sharing followers) to the communities from the previous degrees. Please note that we’re interested in related communities up-to a specific degree (as opposed to only at a specific degree).\n\nExample:\n\nget_related_communities_with_degree(C4, 1) -\u003e [C1]\nget_related_communities_with_degree(C4, 2) -\u003e [C1, C2]\n\n\ncommunity_map = {\n'C1': ['F1', 'F3'],\n'C2': ['F1', 'F2'],\n'C3': ['F2'],\n'C4': ['F3'],\n}\n\n\nfollower_map = {\n'F1': ['C1', 'C2'],\n'F2': ['C2', 'C3'],\n'F3': ['C1', 'C4'],\n}",
+      "stub": {}
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "ID": "reddit-software engineer-senior-dynamic-post-score-calculation",
+  "Title": "Dynamic Post Score Calculation",
+  "Statement": "Reddit's 'hot' and 'controversial' algorithms are complex. This problem asks you to implement and extend a post scoring system with dynamic factors.",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {
+    "cpp": "#include \u003cstring\u003e\n#include \u003cunordered_map\u003e\n#include \u003cunordered_set\u003e\n#include \u003calgorithm\u003e\n\nstruct Post {\n    std::string id;\n    std::string subreddit;\n    int upvotes;\n    int downvotes;\n};\n\nstruct VoteEvent {\n    std::string user_id;\n    std::string post_id;\n    std::string type; // \"upvote\" or \"downvote\"\n};\n\nclass Solution {\npublic:\n    double calculateScore(const Post\u0026 post) {\n        // Part 1: Basic Upvote/Downvote Score\n        // Your code here\n        return 0.0;\n    }\n};",
+    "go": "package main\n\ntype Post struct {\n    ID string\n    Subreddit string\n    Upvotes int\n    Downvotes int\n}\n\ntype VoteEvent struct {\n    UserID string\n    PostID string\n    Type string // \"upvote\" or \"downvote\"\n}\n\nfunc CalculateScore(post Post) float64 {\n    // Part 1: Basic Upvote/Downvote Score\n    // Your code here\n    return 0.0\n}",
+    "java": "import java.util.*;\n\nclass Solution {\n    static class Post {\n        String id; String subreddit; int upvotes; int downvotes; // For Part 1 \u0026 2\n        // For Part 3, these would be raw, or derived from vote events\n    }\n    static class VoteEvent {\n        String userId; String postId; String type; // \"upvote\" or \"downvote\"\n    }\n\n    public double calculateScore(Post post) {\n        // Part 1: Basic Upvote/Downvote Score\n        // Your code here\n        return 0.0;\n    }\n}",
+    "javascript": "function calculateScore(post) {\n    // Part 1: Basic Upvote/Downvote Score\n    // Your code here\n    return 0.0;\n}",
+    "python": "def calculate_score(post: dict) -\u003e float:\n    # Part 1: Basic Upvote/Downvote Score\n    # Your code here\n    pass",
+    "rust": "pub struct Post {\n    pub id: String,\n    pub subreddit: String,\n    pub upvotes: i32,\n    pub downvotes: i32,\n}\n\npub struct VoteEvent {\n    pub user_id: String,\n    pub post_id: String,\n    pub event_type: String, // \"upvote\" or \"downvote\"\n}\n\npub fn calculate_score(post: \u0026Post) -\u003e f64 {\n    // Part 1: Basic Upvote/Downvote Score\n    // Your code here\n    0.0\n}"
+  },
+  "Type": "coding",
+  "IsMultiPart": true,
+  "Parts": [
+    {
+      "partNumber": 1,
+      "statement": "Implement `calculate_score(post)` that returns a numerical score for a Reddit post based solely on its upvotes and downvotes. The score is `upvotes - downvotes`.\n\n**Input:**\n*   `post`: A dictionary/object with at least `upvotes` (int) and `downvotes` (int) fields.\n\n**Output:** An `int` representing the score.\n\n**Example:**\n```\ncalculate_score({\"upvotes\": 100, \"downvotes\": 10}) == 90\ncalculate_score({\"upvotes\": 50, \"downvotes\": 50}) == 0\n```",
+      "stub": null
+    },
+    {
+      "partNumber": 2,
+      "statement": "Enhance `calculate_score` to include a \"controversy\" factor. Posts with a high number of both upvotes and downvotes (i.e., `upvotes` and `downvotes` are both significant) should get a score boost. A simple controversy bonus can be calculated as `0.1 * min(post.upvotes, post.downvotes)`. The final score will be `(post.upvotes - post.downvotes) + controversy_bonus`.\n\n**Input:** Same `post` object as Part 1.\n\n**Output:** A `float` representing the new score.\n\n**Example:**\n```\npost_a = {\"upvotes\": 200, \"downvotes\": 100} # (200-100) + 0.1 * min(200,100) = 100 + 10 = 110\npost_b = {\"upvotes\": 105, \"downvotes\": 95}  # (105-95) + 0.1 * min(105,95) = 10 + 9.5 = 19.5\npost_c = {\"upvotes\": 110, \"downvotes\": 0}   # (110-0) + 0.1 * min(110,0) = 110 + 0 = 110\n\ncalculate_score(post_a) == 110.0\ncalculate_score(post_b) == 19.5\ncalculate_score(post_c) == 110.0\n```",
+      "stub": null
+    },
+    {
+      "partNumber": 3,
+      "statement": "Further extend `calculate_score` to incorporate \"community bias\" or \"moderator weighting.\" Votes from specific users (e.g., moderators, power users) within a specific subreddit should carry more weight. For this part, assume the `upvotes` and `downvotes` fields in the `post` object (from previous parts) are *raw* counts. You'll be provided with a list of individual `vote_events` and a `weighted_users` mapping. If a post is in `subredditX` and `userY` (who is in `weighted_users[subredditX]`) casts an 'upvote' for it, that upvote counts as `2` instead of `1`. Downvotes from weighted users count as `-1` (no extra weight).\n\nYour function should take a `post` (containing only `id` and `subreddit`), a list of `vote_events` relevant to this post, and the `weighted_users` map. First, calculate the *adjusted* `upvotes` and `downvotes` from the `vote_events` based on the `weighted_users`. Then, apply the scoring logic from Part 2 using these adjusted counts.\n\n**Input:**\n*   `post`: A dictionary/object with `id` (str) and `subreddit` (str).\n*   `vote_events`: A list of dictionaries/objects, each with `user_id` (str), `post_id` (str), `type` (str, either \"upvote\" or \"downvote\"). Only events for the given `post.id` will be provided.\n*   `weighted_users`: A dictionary/map where keys are `subreddit_id`s and values are sets/lists of `user_id`s who have weighted votes in that subreddit.\n\n**Output:** A `float` representing the final adjusted score.\n\n**Example:**\n```\npost = {\"id\": \"p1\", \"subreddit\": \"r/tech\"}\nvote_events = [\n    {\"user_id\": \"u1\", \"post_id\": \"p1\", \"type\": \"upvote\"},\n    {\"user_id\": \"u2\", \"post_id\": \"p1\", \"type\": \"upvote\"}, # u2 is a weighted user\n    {\"user_id\": \"u3\", \"post_id\": \"p1\", \"type\": \"downvote\"},\n    {\"user_id\": \"u4\", \"post_id\": \"p1\", \"type\": \"upvote\"}\n]\nweighted_users = {\"r/tech\": {\"u2\"}}\n\n# Processing vote_events for post p1:\n# u1 upvotes: +1\n# u2 upvotes (weighted): +2\n# u3 downvotes: -1\n# u4 upvotes: +1\n# Adjusted upvotes = 1 + 2 + 1 = 4\n# Adjusted downvotes = 1\n\n# Apply Part 2's scoring logic:\n# (adjusted_upvotes - adjusted_downvotes) + 0.1 * min(adjusted_upvotes, adjusted_downvotes)\n# (4 - 1) + 0.1 * min(4, 1) = 3 + 0.1 * 1 = 3.1\n\ncalculate_score(post, vote_events, weighted_users) == 3.1\n```",
+      "stub": null
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "ID": "moderator-access-control",
+  "Title": "Moderator Access Control",
+  "Statement": "Given a log string that, when split by newline, contains:\n\nmod_given_new_access: user_1, user_2 (who gets mod access)\naction: added, removed (type of action)\nmod_take_action: user_3, user_4 (who performed the action)\ntimestamp: float\nPart 1: Basic Implementation\n\nmod_list constructor\n\nParse the log and store in your chosen data structure\ncan_remove_mod(user_1, user_2)\n\nCheck if user_2 has permission to remove user_1\nCondition: user_2 must have become a moderator earlier than user_1\nget_mod_list()\n\nReturn a list of all current moderators",
+  "Languages": [
+    "python",
+    "cpp",
+    "java",
+    "kotlin",
+    "go"
+  ],
+  "Stub": {
+    "python": ""
+  },
+  "Type": "coding",
+  "IsMultiPart": true,
+  "Parts": [
+    {
+      "partNumber": 2,
+      "statement": "Part 2: Community Extension\n\nExtend the three functions such that each community has its own separate mod list",
+      "stub": {}
+    },
+    {
+      "partNumber": 3,
+      "statement": "Part 3: Rank Adjustment\n\nAdd demote(user_1), which should account for when the input contains a \"demote\" action.\nLower the rank/priority of the given user\nExample: if current order is [user_1, user_2, user_3], after demoting user_1 it becomes [user_2, user_1, user_3]",
+      "stub": {}
+    }
+  ]
+}

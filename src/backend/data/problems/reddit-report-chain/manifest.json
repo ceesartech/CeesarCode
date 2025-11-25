@@ -1,0 +1,29 @@
+{
+  "ID": "reddit-report-chain",
+  "Title": "Reddit Report Chain",
+  "Statement": "Part 1\n\nGiven a report chain like:\n\na,b,c\nb,d\nd,e\n\nwhich means a is the manager of b and c，b is the manager of d, etc.\nYou need to print the following output:\n\na\n....b\n........d\n............e\n....c",
+  "Languages": [
+    "python",
+    "cpp",
+    "java",
+    "kotlin",
+    "go"
+  ],
+  "Stub": {
+    "python": ""
+  },
+  "Type": "coding",
+  "IsMultiPart": true,
+  "Parts": [
+    {
+      "partNumber": 2,
+      "statement": "Part 2\n\nAs a manager of managers, a lot of what you hear about the people in your team is filtered through their managers. It can be very useful to hear directly from your team, without that filter. So, to make that easier, we set up what we call \"Skip Level\" meetings, which skips over an entire level of the management tree.\n\nThat might sound more complicated than it really is, so let's talk about a concrete example. In our test data:\n\nAsh can skip over Beck to talk with Eli and Frankie\nAsh\n\n....Beck \u003cSKIPPED\u003e\n\n........Eli\n\n........Frankie\n\nAsh can skip over Dakota to talk to Ginger and Indiana\nAsh\n\n....Dakota \u003cSKIPPED\u003e\n\n........Ginger\n\n........Indiana\n\nDakota can skip over Ginger to talk to Holden\n....Dakota\n\n........Ginger \u003cSKIPPED\u003e\n\n............Holden\nSo, now, let's modify the code to emit a list of ALL valid skip level meetings that we could set up.\n\n[execution time limit] 4 seconds (py3) [memory limit] 1 GB",
+      "stub": {}
+    },
+    {
+      "partNumber": 3,
+      "statement": "Part 3\n\nGiven a person, print out the entire report chain that includes this person.\n\nFor example, given a report chain like:\n\na,b,c\nb,d\nd,e\nThe report chain for d is:\n\na\n....b\n........d\n............e",
+      "stub": {}
+    }
+  ]
+}

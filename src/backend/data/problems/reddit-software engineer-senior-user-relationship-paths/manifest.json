@@ -1,0 +1,40 @@
+{
+  "ID": "reddit-software engineer-senior-user-relationship-paths",
+  "Title": "User Relationship Paths in a Social Graph",
+  "Statement": "Reddit users connect through following subreddits. This problem focuses on finding paths between users based on their shared subreddit interests, mimicking a social graph analysis task.",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {
+    "cpp": "#include \u003cstring\u003e\n#include \u003cvector\u003e\n#include \u003cunordered_map\u003e\n#include \u003cunordered_set\u003e\n#include \u003cqueue\u003e\n#include \u003calgorithm\u003e\n\nclass Solution {\npublic:\n    std::vector\u003cstd::string\u003e findShortestPath(const std::string\u0026 start_user_id, const std::string\u0026 end_user_id, const std::unordered_map\u003cstd::string, std::unordered_set\u003cstd::string\u003e\u003e\u0026 user_subreddit_follows) {\n        // Part 1: Find Shortest Path by Common Subreddits\n        // Your code here\n        return {};\n    }\n};",
+    "go": "package main\n\nimport (\n\t\"container/list\"\n)\n\nfunc FindShortestPath(startUserId, endUserId string, userSubredditFollows map[string][]string) []string {\n    // Part 1: Find Shortest Path by Common Subreddits\n    // Your code here\n    return nil\n}",
+    "java": "import java.util.*;\n\nclass Solution {\n    public List\u003cString\u003e findShortestPath(String startUserId, String endUserId, Map\u003cString, Set\u003cString\u003e\u003e userSubredditFollows) {\n        // Part 1: Find Shortest Path by Common Subreddits\n        // Your code here\n        return null;\n    }\n}",
+    "javascript": "function findShortestPath(startUserId, endUserId, userSubredditFollows) {\n    // Part 1: Find Shortest Path by Common Subreddits\n    // Your code here\n    return null;\n}",
+    "python": "def find_shortest_path(start_user_id: str, end_user_id: str, user_subreddit_follows: dict) -\u003e list | None:\n    # Part 1: Find Shortest Path by Common Subreddits\n    # Your code here\n    pass",
+    "rust": "use std::collections::{HashMap, HashSet, VecDeque};\n\npub fn find_shortest_path(start_user_id: \u0026str, end_user_id: \u0026str, user_subreddit_follows: \u0026HashMap\u003cString, HashSet\u003cString\u003e\u003e) -\u003e Option\u003cVec\u003cString\u003e\u003e {\n    // Part 1: Find Shortest Path by Common Subreddits\n    // Your code here\n    None\n}"
+  },
+  "Type": "coding",
+  "IsMultiPart": true,
+  "Parts": [
+    {
+      "partNumber": 1,
+      "statement": "Implement `find_shortest_path(start_user_id, end_user_id, user_subreddit_follows)` that finds the *shortest path* (in terms of connections) between a `start_user_id` and an `end_user_id`. A connection is formed when two users follow a common subreddit. The path should alternate between `User -\u003e Subreddit -\u003e User -\u003e Subreddit -\u003e ... -\u003e User`.\n\n**Input:**\n*   `start_user_id, end_user_id`: Strings representing the start and end users.\n*   `user_subreddit_follows`: A dictionary/map where keys are user IDs and values are sets/lists of subreddit IDs they follow.\n\n**Output:** A list of strings representing the path of entity IDs (users and subreddits), or `None` if no path exists.\n\n**Example:**\n```\nuser_subreddit_follows = {\n    \"Alice\": {\"r/tech\", \"r/science\"},\n    \"Bob\": {\"r/science\", \"r/programming\"},\n    \"Charlie\": {\"r/programming\", \"r/gaming\"},\n}\n# Alice follows r/science, Bob follows r/science. They connect via r/science.\n# Bob follows r/programming, Charlie follows r/programming. They connect via r/programming.\nfind_shortest_path(\"Alice\", \"Charlie\", user_subreddit_follows) == [\"Alice\", \"r/science\", \"Bob\", \"r/programming\", \"Charlie\"]\n```",
+      "stub": null
+    },
+    {
+      "partNumber": 2,
+      "statement": "Modify the function to `find_all_paths(start_user_id, end_user_id, user_subreddit_follows, max_path_length)` that finds *all distinct paths* (not just the shortest) from `start_user_id` to `end_user_id`. Each path must have a length (number of connections) up to `max_path_length`. Each user node and subreddit node can appear at most once in a single path.\n\n**Input:** Same as Part 1, plus `max_path_length: int`.\n\n**Output:** A list of lists of strings, where each inner list represents a valid path.\n\n**Example:**\n```\nuser_subreddit_follows = {\n    \"Alice\": {\"r/tech\", \"r/science\"},\n    \"Bob\": {\"r/science\", \"r/programming\"},\n    \"Charlie\": {\"r/programming\", \"r/gaming\"},\n    \"David\": {\"r/tech\", \"r/music\"}\n}\n# Assuming min_path_length of 1, max_path_length of 2:\n# Alice -\u003e r/science -\u003e Bob -\u003e r/programming -\u003e Charlie (length 2)\n# Alice -\u003e r/tech -\u003e David -\u003e r/music -\u003e [no path to Charlie from here] (length 2, not to end_user)\nfind_all_paths(\"Alice\", \"Charlie\", user_subreddit_follows, max_path_length=2) == [\n    [\"Alice\", \"r/science\", \"Bob\", \"r/programming\", \"Charlie\"]\n]\n# If there was a direct path for example:\n# user_subreddit_follows[\"Alice\"].add(\"r/gaming\")\n# find_all_paths(\"Alice\", \"Charlie\", user_subreddit_follows, max_path_length=2) would also include\n# [\"Alice\", \"r/gaming\", \"Charlie\"]\n```",
+      "stub": null
+    },
+    {
+      "partNumber": 3,
+      "statement": "Introduce a 'connection strength' to the paths. For each `User -\u003e Subreddit` link, the weight is `1 / (number of users following that subreddit)`. Implement `find_strongest_path(start_user_id, end_user_id, user_subreddit_follows, max_path_length)` to find the path (up to `max_path_length`) from `start_user_id` to `end_user_id` that *maximizes* the product of weights along the path. Assume `max_path_length` is small enough that exponential complexity is acceptable for this part (e.g., via a modified DFS with path pruning or Dijkstra-like algorithm).\n\n**Input:** Same as Part 2.\n\n**Output:** `List[str]` representing the path with the highest product of weights, or `None` if no path exists.\n\n**Example:** (Using `user_subreddit_follows` from Part 2, and calculating counts)\n```\n# Subreddit follower counts:\n# r/tech: 2 (Alice, David)\n# r/science: 2 (Alice, Bob)\n# r/programming: 2 (Bob, Charlie)\n# r/gaming: 1 (Charlie)\n# r/music: 1 (David)\n\n# Path: Alice -\u003e r/science -\u003e Bob -\u003e r/programming -\u003e Charlie\n# Weights: (1/count(r/science)) * (1/count(r/programming)) = (1/2) * (1/2) = 1/4 = 0.25\n\n# Assuming max_path_length=2\nfind_strongest_path(\"Alice\", \"Charlie\", user_subreddit_follows, max_path_length=2) == [\n    \"Alice\", \"r/science\", \"Bob\", \"r/programming\", \"Charlie\"\n]\n```",
+      "stub": null
+    }
+  ]
+}

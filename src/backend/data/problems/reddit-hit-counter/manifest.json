@@ -1,0 +1,24 @@
+{
+  "ID": "reddit-hit-counter",
+  "Title": "Reddit Hit Counter",
+  "Statement": "Implement a hit counter that fits the following interface:\n\npublic interface HitCounter {\n  // Registers a hit at the timestamp.\n  public void hit(int timestamp);\n\n  // Returns the number of hits within 5 minutes of the timestamp.\n  public int getHits(int timestamp);\n}\ngetHits is always going to be called with a timestamp at least as large as the largest timestamp you've seen so far. For this reason, a queue would be extremely inefficient.\n\nThe hits might come out of order. For example:\n\nHitCounter hitCounter = new HitCounter();\nhitCounter.hit(10);\nhitCounter.hit(9);\nhitCounter. getHits(100); // returns 2\nhitCounter.hit(201);\nhitCounter.hit(1);\nhitCounter. getHits(400); // returns 2 (100 and 201)",
+  "Languages": [
+    "python",
+    "cpp",
+    "java",
+    "kotlin",
+    "go"
+  ],
+  "Stub": {
+    "python": ""
+  },
+  "Type": "coding",
+  "IsMultiPart": true,
+  "Parts": [
+    {
+      "partNumber": 2,
+      "statement": "Make it threadsafe.",
+      "stub": {}
+    }
+  ]
+}
