@@ -1,0 +1,92 @@
+# CeesarCode Gamma Environment Dockerfile
+# Pre-production environment - mirrors production but optimized for lower cost
+
+FROM ubuntu:22.04 AS builder
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    build-essential \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Go
+ENV GO_VERSION=1.21.5
+RUN curl -fsSL https://golang.org/dl/go${GO_VERSION}.linux-amd64.tar.gz | tar -C /usr/local -xzf -
+ENV PATH=$PATH:/usr/local/go/bin
+
+# Install Rust
+ENV RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    PATH=/usr/local/cargo/bin:$PATH
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+
+# Install Node.js
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs
+
+# Set working directory
+WORKDIR /app
+
+# Copy source code
+COPY . .
+
+# Build Rust executor
+RUN cd src/executor && cargo build --release
+
+# Build Go backend with gamma flags
+RUN cd src/backend && go mod tidy && \
+    CGO_ENABLED=0 go build -ldflags="-s -w -X main.AppEnv=gamma" -o ../../bin/server .
+
+# Build React frontend for gamma
+RUN cd src/frontend && npm install && VITE_ENV=gamma npm run build
+
+# Production stage - minimal image
+FROM ubuntu:22.04
+
+# Install runtime dependencies for code execution
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    nodejs \
+    npm \
+    g++ \
+    openjdk-17-jdk \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python ML libraries
+RUN pip3 install --break-system-packages pandas numpy scikit-learn matplotlib
+
+# Create app directory
+WORKDIR /app
+
+# Copy built artifacts from builder stage
+COPY --from=builder /app/src/frontend/dist /app/dist
+COPY --from=builder /app/bin/server /app/dist/server
+COPY --from=builder /app/src/executor/target/release /app/dist/release
+COPY --from=builder /app/data /app/dist/data
+COPY --from=builder /app/config/env.gamma /app/dist/.env
+
+# Make binaries executable
+RUN chmod +x /app/dist/server /app/dist/release/executor
+
+# Set working directory to dist
+WORKDIR /app/dist
+
+# Expose port
+EXPOSE 8080
+
+# Set gamma environment
+ENV APP_ENV=gamma
+ENV NODE_ENV=production
+ENV EXECUTOR_MODE=docker
+ENV LOG_LEVEL=info
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/api/problems || exit 1
+
+# Run the application
+CMD ["./server"]
+

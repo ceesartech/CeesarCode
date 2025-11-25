@@ -1,0 +1,53 @@
+version: '3.8'
+
+# CeesarCode Gamma Environment - Docker Compose
+# Pre-production environment for testing and validation
+
+services:
+  ceesarcode-gamma:
+    build:
+      context: ..
+      dockerfile: config/Dockerfile.gamma
+    container_name: ceesarcode-gamma
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - APP_ENV=gamma
+      - NODE_ENV=production
+      - EXECUTOR_MODE=docker
+      - LOG_LEVEL=info
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - MAX_CONCURRENT_EXECUTIONS=5
+      - EXECUTION_TIMEOUT_SECONDS=30
+      - MAX_MEMORY_MB=256
+    volumes:
+      - gamma-data:/app/dist/data
+    networks:
+      - gamma-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/problems"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    # Resource limits for gamma (lower than production)
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+volumes:
+  gamma-data:
+    driver: local
+
+networks:
+  gamma-network:
+    driver: bridge
+

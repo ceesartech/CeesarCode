@@ -22,6 +22,122 @@ import (
 	"google.golang.org/api/option"
 )
 
+// AppEnv can be set at build time with -ldflags
+var AppEnv = "dev"
+
+// Config holds application configuration
+type Config struct {
+	AppEnv                  string
+	Port                    string
+	FrontendOrigin          string
+	ExecutorMode            string
+	LogLevel                string
+	EnablePairProgramming   bool
+	EnableSystemDesignAgent bool
+	EnableWebSearch         bool
+	DefaultAIProvider       string
+	MaxConcurrentExecutions int
+	ExecutionTimeoutSeconds int
+	MaxMemoryMB             int
+}
+
+// Global configuration instance
+var config Config
+
+// Initialize configuration from environment variables
+func initConfig() {
+	config = Config{
+		AppEnv:                  getEnvOrDefault("APP_ENV", AppEnv),
+		Port:                    getEnvOrDefault("PORT", "8080"),
+		FrontendOrigin:          getEnvOrDefault("FRONTEND_ORIGIN", "http://localhost:5173"),
+		ExecutorMode:            getEnvOrDefault("EXECUTOR_MODE", "stub"),
+		LogLevel:                getEnvOrDefault("LOG_LEVEL", "info"),
+		EnablePairProgramming:   getEnvBoolOrDefault("ENABLE_PAIR_PROGRAMMING", true),
+		EnableSystemDesignAgent: getEnvBoolOrDefault("ENABLE_SYSTEM_DESIGN_AGENT", true),
+		EnableWebSearch:         getEnvBoolOrDefault("ENABLE_WEB_SEARCH", true),
+		DefaultAIProvider:       getEnvOrDefault("DEFAULT_AI_PROVIDER", "gemini"),
+		MaxConcurrentExecutions: getEnvIntOrDefault("MAX_CONCURRENT_EXECUTIONS", 10),
+		ExecutionTimeoutSeconds: getEnvIntOrDefault("EXECUTION_TIMEOUT_SECONDS", 60),
+		MaxMemoryMB:             getEnvIntOrDefault("MAX_MEMORY_MB", 512),
+	}
+
+	log.Printf("CeesarCode starting in %s environment", config.AppEnv)
+	log.Printf("Config: Port=%s, ExecutorMode=%s, LogLevel=%s", config.Port, config.ExecutorMode, config.LogLevel)
+}
+
+func getEnvOrDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
+func getEnvBoolOrDefault(key string, defaultValue bool) bool {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+	return strings.ToLower(value) == "true" || value == "1"
+}
+
+func getEnvIntOrDefault(key string, defaultValue int) int {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+	var result int
+	fmt.Sscanf(value, "%d", &result)
+	if result == 0 {
+		return defaultValue
+	}
+	return result
+}
+
+// PairProgrammingRequest represents a request to the pair programming agent
+type PairProgrammingRequest struct {
+	Mode           string    `json:"mode"`           // "coding", "review", "debug", "explain"
+	ProblemContext string    `json:"problemContext"` // Problem statement
+	CodeContext    string    `json:"codeContext"`    // Current code
+	Language       string    `json:"language"`       // Programming language
+	History        []Message `json:"history"`        // Conversation history
+	Query          string    `json:"query"`          // User's question or request
+	Provider       string    `json:"provider"`       // AI provider
+	APIKey         string    `json:"apiKey"`         // Optional API key override
+}
+
+// SystemDesignRequest represents a request to the system design agent
+type SystemDesignRequest struct {
+	Mode           string    `json:"mode"`           // "brainstorm", "review", "deep-dive", "tradeoffs"
+	ProblemContext string    `json:"problemContext"` // System design prompt
+	History        []Message `json:"history"`        // Conversation history
+	Query          string    `json:"query"`          // User's question or request
+	Provider       string    `json:"provider"`       // AI provider
+	APIKey         string    `json:"apiKey"`         // Optional API key override
+}
+
+// Message represents a chat message in conversation history
+type Message struct {
+	Role    string `json:"role"`    // "user" or "assistant"
+	Content string `json:"content"` // Message content
+}
+
+// AgentChatResponse represents a response from the agent
+type AgentChatResponse struct {
+	Status           string            `json:"status"`
+	Messages         []Message         `json:"messages,omitempty"`
+	SuggestedChanges []SuggestedChange `json:"suggestedChanges,omitempty"`
+	Explanation      string            `json:"explanation,omitempty"`
+}
+
+// SuggestedChange represents a code change suggestion
+type SuggestedChange struct {
+	Description string `json:"description"`
+	OldCode     string `json:"oldCode,omitempty"`
+	NewCode     string `json:"newCode"`
+	LineStart   int    `json:"lineStart,omitempty"`
+	LineEnd     int    `json:"lineEnd,omitempty"`
+}
+
 type Part struct {
 	PartNumber int               `json:"partNumber"` // 1, 2, 3, etc.
 	Statement  string            `json:"statement"`  // Part-specific statement
@@ -81,7 +197,15 @@ var dataDir = "./data/problems"
 var distDir = "./"
 
 func main() {
+	// Initialize configuration from environment
+	initConfig()
+
 	mux := http.NewServeMux()
+
+	// Health check endpoint
+	mux.HandleFunc("/api/health", healthCheck)
+	mux.HandleFunc("/api/config", getPublicConfig)
+
 	// More specific routes first
 	mux.HandleFunc("/api/problems/create", createProblem)
 	mux.HandleFunc("/api/problems/clear", clearAllProblems)
@@ -104,8 +228,38 @@ func main() {
 	mux.HandleFunc("/api/upload", uploadFile)
 	mux.HandleFunc("/api/agent/generate", generateQuestions)
 	mux.HandleFunc("/api/agent/clean", cleanAIGuestions)
+
+	// New v1 API endpoints for pair programming and system design agents
+	mux.HandleFunc("/api/v1/agent/pair-programming", handlePairProgramming)
+	mux.HandleFunc("/api/v1/agent/system-design", handleSystemDesign)
+
 	mux.Handle("/", http.FileServer(http.Dir(distDir)))
-	log.Fatal(http.ListenAndServe(":8080", mux))
+
+	addr := ":" + config.Port
+	log.Printf("CeesarCode server starting on %s (env: %s)", addr, config.AppEnv)
+	log.Fatal(http.ListenAndServe(addr, mux))
+}
+
+// healthCheck returns server health status
+func healthCheck(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":      "healthy",
+		"environment": config.AppEnv,
+		"version":     "1.0.0",
+		"timestamp":   time.Now().UTC().Format(time.RFC3339),
+	})
+}
+
+// getPublicConfig returns non-sensitive configuration
+func getPublicConfig(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"environment":             config.AppEnv,
+		"enablePairProgramming":   config.EnablePairProgramming,
+		"enableSystemDesignAgent": config.EnableSystemDesignAgent,
+		"defaultAIProvider":       config.DefaultAIProvider,
+	})
 }
 
 func handleProblemRoutes(w http.ResponseWriter, r *http.Request) {
@@ -3610,4 +3764,653 @@ func generateSampleTestCase(problemID string) (string, string) {
 
 	// Default test case
 	return "test input", "test output"
+}
+
+// ==========================================
+// Pair Programming & System Design Agents
+// ==========================================
+
+// handlePairProgramming handles requests to the pair programming agent
+func handlePairProgramming(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Check if feature is enabled
+	if !config.EnablePairProgramming {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":  "error",
+			"message": "Pair programming feature is disabled",
+		})
+		return
+	}
+
+	var req PairProgrammingRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Validate request
+	if req.Query == "" {
+		http.Error(w, "Query is required", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("Pair programming request: mode=%s, language=%s", req.Mode, req.Language)
+
+	// Generate response using AI
+	response, err := generatePairProgrammingResponse(req)
+	if err != nil {
+		log.Printf("Pair programming error: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":  "error",
+			"message": fmt.Sprintf("Failed to generate response: %v", err),
+		})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// handleSystemDesign handles requests to the system design agent
+func handleSystemDesign(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Check if feature is enabled
+	if !config.EnableSystemDesignAgent {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":  "error",
+			"message": "System design agent feature is disabled",
+		})
+		return
+	}
+
+	var req SystemDesignRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Validate request
+	if req.Query == "" && req.ProblemContext == "" {
+		http.Error(w, "Query or problem context is required", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("System design request: mode=%s", req.Mode)
+
+	// Generate response using AI
+	response, err := generateSystemDesignResponse(req)
+	if err != nil {
+		log.Printf("System design error: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":  "error",
+			"message": fmt.Sprintf("Failed to generate response: %v", err),
+		})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// generatePairProgrammingResponse uses AI to generate pair programming assistance
+func generatePairProgrammingResponse(req PairProgrammingRequest) (*AgentChatResponse, error) {
+	// Determine provider and API key
+	provider := strings.ToLower(req.Provider)
+	if provider == "" {
+		provider = config.DefaultAIProvider
+	}
+
+	apiKey := req.APIKey
+	if apiKey == "" {
+		switch provider {
+		case "gemini":
+			apiKey = os.Getenv("GEMINI_API_KEY")
+		case "openai":
+			apiKey = os.Getenv("OPENAI_API_KEY")
+		case "claude":
+			apiKey = os.Getenv("ANTHROPIC_API_KEY")
+		}
+	}
+
+	if apiKey == "" {
+		// Return helpful mock response if no API key
+		return generateMockPairProgrammingResponse(req), nil
+	}
+
+	// Build the prompt for pair programming
+	prompt := buildPairProgrammingPrompt(req)
+
+	// Call the appropriate AI provider
+	var responseText string
+	var err error
+
+	switch provider {
+	case "gemini":
+		responseText, err = callGeminiChat(prompt, apiKey)
+	case "openai":
+		responseText, err = callOpenAIChat(prompt, apiKey)
+	case "claude":
+		responseText, err = callClaudeChat(prompt, apiKey)
+	default:
+		responseText, err = callGeminiChat(prompt, apiKey)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse the response and extract suggestions
+	return parsePairProgrammingResponse(responseText, req)
+}
+
+// generateSystemDesignResponse uses AI to generate system design assistance
+func generateSystemDesignResponse(req SystemDesignRequest) (*AgentChatResponse, error) {
+	// Determine provider and API key
+	provider := strings.ToLower(req.Provider)
+	if provider == "" {
+		provider = config.DefaultAIProvider
+	}
+
+	apiKey := req.APIKey
+	if apiKey == "" {
+		switch provider {
+		case "gemini":
+			apiKey = os.Getenv("GEMINI_API_KEY")
+		case "openai":
+			apiKey = os.Getenv("OPENAI_API_KEY")
+		case "claude":
+			apiKey = os.Getenv("ANTHROPIC_API_KEY")
+		}
+	}
+
+	if apiKey == "" {
+		// Return helpful mock response if no API key
+		return generateMockSystemDesignResponse(req), nil
+	}
+
+	// Build the prompt for system design
+	prompt := buildSystemDesignPrompt(req)
+
+	// Call the appropriate AI provider
+	var responseText string
+	var err error
+
+	switch provider {
+	case "gemini":
+		responseText, err = callGeminiChat(prompt, apiKey)
+	case "openai":
+		responseText, err = callOpenAIChat(prompt, apiKey)
+	case "claude":
+		responseText, err = callClaudeChat(prompt, apiKey)
+	default:
+		responseText, err = callGeminiChat(prompt, apiKey)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse the response
+	return parseSystemDesignResponse(responseText, req)
+}
+
+// buildPairProgrammingPrompt constructs the prompt for pair programming assistance
+func buildPairProgrammingPrompt(req PairProgrammingRequest) string {
+	var sb strings.Builder
+
+	// System role
+	sb.WriteString(`You are an expert AI pair programmer. You are collaborating with a developer who is the "navigator" making high-level decisions, while you act as the "driver" helping with implementation details.
+
+IMPORTANT GUIDELINES:
+1. Suggest code changes but NEVER apply them automatically - always explain what you suggest
+2. Ask clarifying questions when requirements are unclear
+3. Explain your reasoning and tradeoffs
+4. Keep responses focused and actionable
+5. Use code blocks with proper syntax highlighting
+6. Suggest incremental, testable changes
+
+`)
+
+	// Mode-specific instructions
+	switch req.Mode {
+	case "coding":
+		sb.WriteString("MODE: Active Coding Assistance\n")
+		sb.WriteString("Focus on helping write new code, implementing features, and suggesting improvements.\n\n")
+	case "review":
+		sb.WriteString("MODE: Code Review\n")
+		sb.WriteString("Focus on reviewing the code for bugs, performance issues, and best practices.\n\n")
+	case "debug":
+		sb.WriteString("MODE: Debugging\n")
+		sb.WriteString("Focus on identifying and fixing bugs in the code.\n\n")
+	case "explain":
+		sb.WriteString("MODE: Code Explanation\n")
+		sb.WriteString("Focus on explaining what the code does and how it works.\n\n")
+	default:
+		sb.WriteString("MODE: General Assistance\n\n")
+	}
+
+	// Add problem context if provided
+	if req.ProblemContext != "" {
+		sb.WriteString("PROBLEM CONTEXT:\n")
+		sb.WriteString(req.ProblemContext)
+		sb.WriteString("\n\n")
+	}
+
+	// Add code context if provided
+	if req.CodeContext != "" {
+		sb.WriteString("CURRENT CODE:\n```")
+		sb.WriteString(req.Language)
+		sb.WriteString("\n")
+		sb.WriteString(req.CodeContext)
+		sb.WriteString("\n```\n\n")
+	}
+
+	// Add conversation history
+	if len(req.History) > 0 {
+		sb.WriteString("CONVERSATION HISTORY:\n")
+		for _, msg := range req.History {
+			if msg.Role == "user" {
+				sb.WriteString("User: ")
+			} else {
+				sb.WriteString("Assistant: ")
+			}
+			sb.WriteString(msg.Content)
+			sb.WriteString("\n\n")
+		}
+	}
+
+	// Add current query
+	sb.WriteString("CURRENT REQUEST:\n")
+	sb.WriteString(req.Query)
+	sb.WriteString("\n\nPlease provide helpful, actionable assistance. Include code suggestions in properly formatted code blocks.")
+
+	return sb.String()
+}
+
+// buildSystemDesignPrompt constructs the prompt for system design assistance
+func buildSystemDesignPrompt(req SystemDesignRequest) string {
+	var sb strings.Builder
+
+	// System role
+	sb.WriteString(`You are an expert system design partner. You help developers think through architecture decisions, discuss tradeoffs, and design scalable systems.
+
+IMPORTANT GUIDELINES:
+1. Ask clarifying questions to understand requirements
+2. Discuss tradeoffs between different approaches
+3. Consider scalability, reliability, and maintainability
+4. Use diagrams when helpful (describe in text/ASCII)
+5. Reference real-world systems and patterns
+6. Break down complex systems into components
+
+`)
+
+	// Mode-specific instructions
+	switch req.Mode {
+	case "brainstorm":
+		sb.WriteString("MODE: Brainstorming\n")
+		sb.WriteString("Help generate ideas and explore different approaches.\n\n")
+	case "review":
+		sb.WriteString("MODE: Design Review\n")
+		sb.WriteString("Review the proposed design and suggest improvements.\n\n")
+	case "deep-dive":
+		sb.WriteString("MODE: Deep Dive\n")
+		sb.WriteString("Go deep on a specific component or aspect of the design.\n\n")
+	case "tradeoffs":
+		sb.WriteString("MODE: Tradeoff Analysis\n")
+		sb.WriteString("Focus on comparing alternatives and discussing tradeoffs.\n\n")
+	default:
+		sb.WriteString("MODE: General System Design Discussion\n\n")
+	}
+
+	// Add problem context if provided
+	if req.ProblemContext != "" {
+		sb.WriteString("DESIGN CHALLENGE:\n")
+		sb.WriteString(req.ProblemContext)
+		sb.WriteString("\n\n")
+	}
+
+	// Add conversation history
+	if len(req.History) > 0 {
+		sb.WriteString("DISCUSSION HISTORY:\n")
+		for _, msg := range req.History {
+			if msg.Role == "user" {
+				sb.WriteString("User: ")
+			} else {
+				sb.WriteString("Assistant: ")
+			}
+			sb.WriteString(msg.Content)
+			sb.WriteString("\n\n")
+		}
+	}
+
+	// Add current query
+	if req.Query != "" {
+		sb.WriteString("CURRENT QUESTION:\n")
+		sb.WriteString(req.Query)
+	} else {
+		sb.WriteString("Please help me design this system. Start by asking clarifying questions about the requirements.")
+	}
+
+	return sb.String()
+}
+
+// callGeminiChat calls Gemini API for chat
+func callGeminiChat(prompt, apiKey string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
+	if err != nil {
+		return "", fmt.Errorf("failed to create Gemini client: %v", err)
+	}
+	defer client.Close()
+
+	model := client.GenerativeModel("gemini-2.5-flash")
+	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
+	if err != nil {
+		return "", fmt.Errorf("Gemini API error: %v", err)
+	}
+
+	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
+		return "", fmt.Errorf("empty response from Gemini")
+	}
+
+	var result strings.Builder
+	for _, part := range resp.Candidates[0].Content.Parts {
+		result.WriteString(fmt.Sprintf("%v", part))
+	}
+
+	return result.String(), nil
+}
+
+// callOpenAIChat calls OpenAI API for chat
+func callOpenAIChat(prompt, apiKey string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	requestBody := map[string]interface{}{
+		"model": "gpt-4o-mini",
+		"messages": []map[string]string{
+			{"role": "user", "content": prompt},
+		},
+		"temperature": 0.7,
+		"max_tokens":  4000,
+	}
+
+	jsonData, err := json.Marshal(requestBody)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", "https://api.openai.com/v1/chat/completions", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %v", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
+
+	client := &http.Client{Timeout: 2 * time.Minute}
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return "", fmt.Errorf("OpenAI API request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("OpenAI API error (status %d): %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var openAIResp struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+
+	if err := json.Unmarshal(bodyBytes, &openAIResp); err != nil {
+		return "", fmt.Errorf("failed to decode response: %v", err)
+	}
+
+	if len(openAIResp.Choices) == 0 {
+		return "", fmt.Errorf("no choices in OpenAI response")
+	}
+
+	return openAIResp.Choices[0].Message.Content, nil
+}
+
+// callClaudeChat calls Claude API for chat
+func callClaudeChat(prompt, apiKey string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	requestBody := map[string]interface{}{
+		"model":      "claude-3-5-sonnet-20241022",
+		"max_tokens": 4000,
+		"messages": []map[string]string{
+			{"role": "user", "content": prompt},
+		},
+	}
+
+	jsonData, err := json.Marshal(requestBody)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", "https://api.anthropic.com/v1/messages", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %v", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("x-api-key", apiKey)
+	httpReq.Header.Set("anthropic-version", "2023-06-01")
+
+	client := &http.Client{Timeout: 2 * time.Minute}
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return "", fmt.Errorf("Claude API request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("Claude API error (status %d): %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var claudeResp struct {
+		Content []struct {
+			Text string `json:"text"`
+		} `json:"content"`
+	}
+
+	if err := json.Unmarshal(bodyBytes, &claudeResp); err != nil {
+		return "", fmt.Errorf("failed to decode response: %v", err)
+	}
+
+	if len(claudeResp.Content) == 0 {
+		return "", fmt.Errorf("empty content in Claude response")
+	}
+
+	return claudeResp.Content[0].Text, nil
+}
+
+// parsePairProgrammingResponse parses AI response into structured format
+func parsePairProgrammingResponse(responseText string, req PairProgrammingRequest) (*AgentChatResponse, error) {
+	response := &AgentChatResponse{
+		Status: "success",
+		Messages: []Message{
+			{Role: "assistant", Content: responseText},
+		},
+	}
+
+	// Extract code suggestions if present
+	codeBlockPattern := regexp.MustCompile("```[a-z]*\n([\\s\\S]*?)```")
+	matches := codeBlockPattern.FindAllStringSubmatch(responseText, -1)
+
+	for i, match := range matches {
+		if len(match) > 1 {
+			response.SuggestedChanges = append(response.SuggestedChanges, SuggestedChange{
+				Description: fmt.Sprintf("Code suggestion %d", i+1),
+				NewCode:     strings.TrimSpace(match[1]),
+			})
+		}
+	}
+
+	return response, nil
+}
+
+// parseSystemDesignResponse parses AI response into structured format
+func parseSystemDesignResponse(responseText string, req SystemDesignRequest) (*AgentChatResponse, error) {
+	return &AgentChatResponse{
+		Status: "success",
+		Messages: []Message{
+			{Role: "assistant", Content: responseText},
+		},
+		Explanation: responseText,
+	}, nil
+}
+
+// generateMockPairProgrammingResponse returns a helpful mock response when no API key is available
+func generateMockPairProgrammingResponse(req PairProgrammingRequest) *AgentChatResponse {
+	var responseContent string
+
+	switch req.Mode {
+	case "coding":
+		responseContent = `I'd be happy to help you with coding! However, I need an AI API key to provide real-time assistance.
+
+**To enable AI-powered pair programming:**
+1. Get a free API key from Google AI Studio: https://aistudio.google.com/app/apikey
+2. Set it in your environment: export GEMINI_API_KEY="your-key"
+3. Or provide it in the settings panel
+
+In the meantime, here are some general tips:
+- Break down your problem into smaller functions
+- Write tests first (TDD approach)
+- Use meaningful variable names
+- Add comments for complex logic`
+	case "review":
+		responseContent = `I can help review your code! Configure an AI API key to get detailed code reviews.
+
+**General code review checklist:**
+- [ ] Code follows consistent style
+- [ ] Functions have single responsibility
+- [ ] Error handling is comprehensive
+- [ ] Edge cases are considered
+- [ ] Performance is optimized`
+	case "debug":
+		responseContent = `I can help debug your code! Configure an AI API key for intelligent debugging.
+
+**Debugging tips:**
+1. Add console.log/print statements
+2. Check variable values at each step
+3. Verify input data is correct
+4. Look for off-by-one errors
+5. Check null/undefined values`
+	default:
+		responseContent = `I'm your AI pair programming assistant! 
+
+To get started, configure an AI API key (Gemini, OpenAI, or Claude) in your settings.
+
+**Available modes:**
+- **Coding**: Help write and implement code
+- **Review**: Get code reviews and suggestions
+- **Debug**: Help identify and fix bugs
+- **Explain**: Understand how code works`
+	}
+
+	return &AgentChatResponse{
+		Status: "success",
+		Messages: []Message{
+			{Role: "assistant", Content: responseContent},
+		},
+	}
+}
+
+// generateMockSystemDesignResponse returns a helpful mock response when no API key is available
+func generateMockSystemDesignResponse(req SystemDesignRequest) *AgentChatResponse {
+	var responseContent string
+
+	if req.ProblemContext != "" {
+		responseContent = fmt.Sprintf(`Great system design challenge! To get AI-powered assistance, configure an API key.
+
+**For your challenge: "%s"**
+
+Here's a structured approach:
+
+1. **Clarify Requirements**
+   - Functional requirements
+   - Non-functional requirements (scale, latency, availability)
+   - Constraints
+
+2. **High-Level Design**
+   - Major components
+   - Data flow
+   - API design
+
+3. **Deep Dive**
+   - Database schema
+   - Caching strategy
+   - Scaling approach
+
+4. **Tradeoffs**
+   - CAP theorem considerations
+   - Cost vs performance
+   - Complexity vs maintainability
+
+Configure an AI key to discuss these in detail!`, req.ProblemContext)
+	} else {
+		responseContent = `I'm your system design partner! Configure an AI API key to get detailed assistance.
+
+**System Design Interview Framework:**
+
+1. **Requirements Clarification** (5 min)
+   - Ask about scale, users, features
+
+2. **High-Level Design** (10-15 min)
+   - Draw major components
+   - Define APIs
+
+3. **Detailed Design** (15-20 min)
+   - Database design
+   - Caching, CDN
+   - Load balancing
+
+4. **Scaling & Tradeoffs** (5-10 min)
+   - Handle edge cases
+   - Discuss limitations`
+	}
+
+	return &AgentChatResponse{
+		Status: "success",
+		Messages: []Message{
+			{Role: "assistant", Content: responseContent},
+		},
+	}
 }

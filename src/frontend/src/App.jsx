@@ -4,6 +4,194 @@ import Editor from '@monaco-editor/react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
+import { AgentPanel } from './components/AgentPanel'
+
+// ===== SVG Icon Components - Replace emojis with clean icons =====
+const IconPlay = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+    <polygon points="5,3 19,12 5,21"/>
+  </svg>
+)
+
+const IconTrash = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3,6 5,6 21,6"/>
+    <path d="M19,6v14a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6M8,6V4a2,2,0,0,1,2-2h4a2,2,0,0,1,2,2V6"/>
+    <line x1="10" y1="11" x2="10" y2="17"/>
+    <line x1="14" y1="11" x2="14" y2="17"/>
+  </svg>
+)
+
+const IconArrowLeft = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="19" y1="12" x2="5" y2="12"/>
+    <polyline points="12,19 5,12 12,5"/>
+  </svg>
+)
+
+const IconArrowRight = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="5" y1="12" x2="19" y2="12"/>
+    <polyline points="12,5 19,12 12,19"/>
+  </svg>
+)
+
+const IconRefresh = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="23,4 23,10 17,10"/>
+    <path d="M20.49,15A9,9,0,1,1,21,12"/>
+  </svg>
+)
+
+const IconUsers = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17,21v-2a4,4,0,0,0-4-4H5a4,4,0,0,0-4,4v2"/>
+    <circle cx="9" cy="7" r="4"/>
+    <path d="M23,21v-2a4,4,0,0,0-3-3.87"/>
+    <path d="M16,3.13a4,4,0,0,1,0,7.75"/>
+  </svg>
+)
+
+const IconChevronLeft = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="15,18 9,12 15,6"/>
+  </svg>
+)
+
+const IconChevronRight = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="9,6 15,12 9,18"/>
+  </svg>
+)
+
+const IconX = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"/>
+    <line x1="6" y1="6" x2="18" y2="18"/>
+  </svg>
+)
+
+const IconFileText = ({ size = 32 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14,2H6A2,2,0,0,0,4,4V20a2,2,0,0,0,2,2H18a2,2,0,0,0,2-2V8Z"/>
+    <polyline points="14,2 14,8 20,8"/>
+    <line x1="16" y1="13" x2="8" y2="13"/>
+    <line x1="16" y1="17" x2="8" y2="17"/>
+    <line x1="10" y1="9" x2="8" y2="9"/>
+  </svg>
+)
+
+const IconMonitor = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+    <line x1="8" y1="21" x2="16" y2="21"/>
+    <line x1="12" y1="17" x2="12" y2="21"/>
+  </svg>
+)
+
+const IconBook = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4,19.5A2.5,2.5,0,0,1,6.5,17H20"/>
+    <path d="M6.5,2H20V22H6.5A2.5,2.5,0,0,1,4,19.5v-15A2.5,2.5,0,0,1,6.5,2Z"/>
+  </svg>
+)
+
+const IconMoon = ({ size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21,12.79A9,9,0,1,1,11.21,3,7,7,0,0,0,21,12.79Z"/>
+  </svg>
+)
+
+const IconSun = ({ size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="5"/>
+    <line x1="12" y1="1" x2="12" y2="3"/>
+    <line x1="12" y1="21" x2="12" y2="23"/>
+    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+    <line x1="1" y1="12" x2="3" y2="12"/>
+    <line x1="21" y1="12" x2="23" y2="12"/>
+    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+  </svg>
+)
+
+const IconPlus = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="5" x2="12" y2="19"/>
+    <line x1="5" y1="12" x2="19" y2="12"/>
+  </svg>
+)
+
+const IconCpu = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="4" y="4" width="16" height="16" rx="2" ry="2"/>
+    <rect x="9" y="9" width="6" height="6"/>
+    <line x1="9" y1="1" x2="9" y2="4"/>
+    <line x1="15" y1="1" x2="15" y2="4"/>
+    <line x1="9" y1="20" x2="9" y2="23"/>
+    <line x1="15" y1="20" x2="15" y2="23"/>
+    <line x1="20" y1="9" x2="23" y2="9"/>
+    <line x1="20" y1="14" x2="23" y2="14"/>
+    <line x1="1" y1="9" x2="4" y2="9"/>
+    <line x1="1" y1="14" x2="4" y2="14"/>
+  </svg>
+)
+
+const IconSparkles = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 3L14.12 8.5L20 9.27L15.82 13.14L17 19L12 16L7 19L8.18 13.14L4 9.27L9.88 8.5L12 3Z"/>
+  </svg>
+)
+
+const IconSearch = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="8"/>
+    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+  </svg>
+)
+
+const IconPackage = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/>
+    <path d="M21,16V8a2,2,0,0,0-1-1.73l-7-4a2,2,0,0,0-2,0l-7,4A2,2,0,0,0,3,8v8a2,2,0,0,0,1,1.73l7,4a2,2,0,0,0,2,0l7-4A2,2,0,0,0,21,16Z"/>
+    <polyline points="3.27,6.96 12,12.01 20.73,6.96"/>
+    <line x1="12" y1="22.08" x2="12" y2="12"/>
+  </svg>
+)
+
+const IconAlertTriangle = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M10.29,3.86,1.82,18a2,2,0,0,0,1.71,3H20.47a2,2,0,0,0,1.71-3L13.71,3.86A2,2,0,0,0,10.29,3.86Z"/>
+    <line x1="12" y1="9" x2="12" y2="13"/>
+    <line x1="12" y1="17" x2="12.01" y2="17"/>
+  </svg>
+)
+
+const IconLightbulb = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9,18h6"/>
+    <path d="M10,22h4"/>
+    <path d="M15.09,14c.18-.98.65-1.74,1.41-2.5A4.65,4.65,0,0,0,18,8,6,6,0,0,0,6,8c0,1,0,2,1.5,3.5.76.76,1.23,1.52,1.41,2.5"/>
+  </svg>
+)
+
+const IconZap = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="13,2 3,14 12,14 11,22 21,10 12,10 13,2"/>
+  </svg>
+)
+
+const IconRobot = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="11" width="18" height="10" rx="2"/>
+    <circle cx="12" cy="5" r="2"/>
+    <path d="M12 7v4"/>
+    <circle cx="8" cy="16" r="1" fill="currentColor"/>
+    <circle cx="16" cy="16" r="1" fill="currentColor"/>
+  </svg>
+)
+// ===== End SVG Icon Components =====
 
 // Lazy load Excalidraw to prevent blocking main thread
 const Excalidraw = lazy(() => 
@@ -235,28 +423,44 @@ const styles = {
     secondary: '#F9FAFB', // Off-white
     accent: '#1E40AF', // Darker blue
     background: '#FFFFFF',
-    surface: '#F3F4F6',
+    surface: '#F9FAFB',
+    surfaceHover: '#F3F4F6',
+    hover: '#EFF6FF', // Light blue hover
     text: '#111827',
     textSecondary: '#6B7280',
     border: '#E5E7EB',
+    borderHover: '#D1D5DB',
     success: '#10B981',
     error: '#EF4444',
     warning: '#F59E0B',
-    codeBackground: '#FAFAFA'
+    codeBackground: '#FAFAFA',
+    gradient: 'linear-gradient(135deg, #2563EB 0%, #1E40AF 100%)',
+    gradientAccent: 'linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%)',
+    shadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1)',
+    shadowMd: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)',
+    shadowLg: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)'
   },
   dark: {
     primary: '#3B82F6', // Brighter blue for dark mode
     secondary: '#1F2937', // Dark grey
     accent: '#60A5FA', // Light blue
-    background: '#111827',
-    surface: '#374151',
-    text: '#F9FAFB',
-    textSecondary: '#9CA3AF',
-    border: '#4B5563',
+    background: '#0F172A', // Darker slate background
+    surface: '#1E293B', // Slate surface
+    surfaceHover: '#334155',
+    hover: 'rgba(59, 130, 246, 0.1)', // Blue tinted hover
+    text: '#F8FAFC',
+    textSecondary: '#94A3B8',
+    border: '#334155',
+    borderHover: '#475569',
     success: '#34D399',
     error: '#F87171',
     warning: '#FBBF24',
-    codeBackground: '#1E1E1E'
+    codeBackground: '#0F172A',
+    gradient: 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)',
+    gradientAccent: 'linear-gradient(135deg, #A78BFA 0%, #8B5CF6 100%)',
+    shadow: '0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px -1px rgba(0, 0, 0, 0.3)',
+    shadowMd: '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.3)',
+    shadowLg: '0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.4)'
   }
 }
 
@@ -478,14 +682,14 @@ const JupyterLiteNotebook = React.memo(({ isDarkMode, theme }) => {
           <span id="status" class="status loading">Loading Python...</span>
         </div>
         <div class="toolbar">
-          <button class="btn btn-primary" id="runAll" disabled>▶ Run All</button>
+          <button class="btn btn-primary" id="runAll" disabled><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="margin-right:4px;vertical-align:middle"><polygon points="5,3 19,12 5,21"/></svg> Run All</button>
           <button class="btn btn-secondary" id="addCell">+ Add Cell</button>
           <button class="btn btn-secondary" id="clearAll">Clear All</button>
         </div>
       </div>
       <div class="cells" id="cells">
         <div class="packages-info">
-          <strong>📦 Available Packages:</strong>
+          <strong><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21,16V8a2,2,0,0,0-1-1.73l-7-4a2,2,0,0,0-2,0l-7,4A2,2,0,0,0,3,8v8a2,2,0,0,0,1,1.73l7,4a2,2,0,0,0,2,0l7-4A2,2,0,0,0,21,16Z"/><polyline points="3.27,6.96 12,12.01 20.73,6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg> Available Packages:</strong>
           numpy, pandas, scikit-learn, matplotlib, scipy, sympy, networkx, and more.
           Use <code>import micropip; await micropip.install('package')</code> to install additional packages.
         </div>
@@ -539,7 +743,7 @@ def show_plot():
                 <span class="cell-num">In [\${cellCount}]:</span>
               </div>
               <div class="cell-actions">
-                <button class="cell-btn run" onclick="runCell('\${cellId}')">▶ Run</button>
+                <button class="cell-btn run" onclick="runCell('\${cellId}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="margin-right:4px;vertical-align:middle"><polygon points="5,3 19,12 5,21"/></svg>Run</button>
                 <button class="cell-btn" onclick="clearCell('\${cellId}')">Clear</button>
                 <button class="cell-btn" onclick="deleteCell('\${cellId}')">×</button>
               </div>
@@ -683,8 +887,8 @@ _output
         flexShrink: 0
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ fontSize: '14px', fontWeight: '600', color: isDarkMode ? '#D4D4D4' : '#1F2937' }}>
-            🐍 ML Notebook
+          <span style={{ fontSize: '14px', fontWeight: '600', color: isDarkMode ? '#D4D4D4' : '#1F2937', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <IconCpu size={16} /> ML Notebook
           </span>
           {isLoading && (
             <span style={{ fontSize: '12px', color: '#F59E0B' }}>
@@ -706,7 +910,7 @@ _output
               fontWeight: '500'
             }}
           >
-            {useEmbedded ? '🔗 Open JupyterLite' : '📓 Use Embedded'}
+            {useEmbedded ? 'Open JupyterLite' : 'Use Embedded'}
           </button>
         </div>
       </div>
@@ -724,7 +928,7 @@ _output
             textAlign: 'center',
             padding: '20px'
           }}>
-            <span style={{ fontSize: '48px', marginBottom: '16px' }}>⚠️</span>
+            <span style={{ display: 'block', marginBottom: '16px' }}><IconAlertTriangle size={48} /></span>
             <p>{error}</p>
             <button
               onClick={() => {
@@ -1013,6 +1217,9 @@ function AppContent() {
     parts: [] // Array of parts for multi-part questions (Part 2, Part 3, etc.)
   })
   const [isFullscreen, setIsFullscreen] = useState(false)
+  
+  // Agent panel state for AI pair programming
+  const [isAgentPanelOpen, setIsAgentPanelOpen] = useState(false)
   
   // Search and sort state
   const [searchQuery, setSearchQuery] = useState('')
@@ -4397,17 +4604,29 @@ function AppContent() {
               cursor: 'pointer',
               fontWeight: '500',
               transition: 'all 0.2s ease',
-              boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+              boxShadow: '0 2px 4px 0 rgba(37, 99, 235, 0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
             }}
-            onMouseEnter={(e) => e.target.style.backgroundColor = theme.accent}
-            onMouseLeave={(e) => e.target.style.backgroundColor = theme.primary}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = theme.accent
+              e.currentTarget.style.transform = 'translateY(-1px)'
+              e.currentTarget.style.boxShadow = '0 4px 8px 0 rgba(37, 99, 235, 0.3)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = theme.primary
+              e.currentTarget.style.transform = 'translateY(0)'
+              e.currentTarget.style.boxShadow = '0 2px 4px 0 rgba(37, 99, 235, 0.2)'
+            }}
           >
-            <span style={{ marginRight: '6px' }}>+</span>Create Problem
+            <IconPlus size={16} />
+            <span>Create Problem</span>
           </button>
           <button
             onClick={() => setShowAgent(true)}
             style={{
-              backgroundColor: theme.accent,
+              background: 'linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%)',
               color: '#FFFFFF',
               border: 'none',
               borderRadius: '8px',
@@ -4416,12 +4635,22 @@ function AppContent() {
               cursor: 'pointer',
               fontWeight: '500',
               transition: 'all 0.2s ease',
-              boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+              boxShadow: '0 2px 4px 0 rgba(139, 92, 246, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
             }}
-            onMouseEnter={(e) => e.target.style.opacity = '0.9'}
-            onMouseLeave={(e) => e.target.style.opacity = '1'}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-1px)'
+              e.currentTarget.style.boxShadow = '0 4px 8px 0 rgba(139, 92, 246, 0.4)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)'
+              e.currentTarget.style.boxShadow = '0 2px 4px 0 rgba(139, 92, 246, 0.3)'
+            }}
           >
-            AI Agent
+            <IconRobot size={16} />
+            <span>AI Agent</span>
           </button>
   </div>
 
@@ -4453,7 +4682,7 @@ function AppContent() {
               }}
               title="Go back"
             >
-              ← Back
+              <IconArrowLeft size={14} /> Back
             </button>
             <button
               onClick={() => window.history.forward()}
@@ -4470,7 +4699,7 @@ function AppContent() {
               }}
               title="Go forward"
             >
-              Forward →
+              Forward <IconArrowRight size={14} />
             </button>
             <button
               onClick={() => window.location.reload()}
@@ -4487,22 +4716,63 @@ function AppContent() {
               }}
               title="Refresh page"
             >
-              <span style={{ marginRight: '4px' }}>↻</span>Refresh
+              <IconRefresh size={14} /><span style={{ marginLeft: '4px' }}>Refresh</span>
             </button>
           </div>
+          <button
+            onClick={() => setIsAgentPanelOpen(!isAgentPanelOpen)}
+            style={{
+              backgroundColor: isAgentPanelOpen ? theme.primary : theme.surface,
+              border: `1px solid ${isAgentPanelOpen ? theme.primary : theme.border}`,
+              borderRadius: '6px',
+              padding: '8px 12px',
+              color: isAgentPanelOpen ? '#fff' : theme.text,
+              cursor: 'pointer',
+              fontSize: '12px',
+              marginRight: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+            title="AI Pair Programming & System Design"
+          >
+            <IconUsers size={16} />
+            <span style={{ marginLeft: '6px' }}>Pair Programming</span>
+            <span style={{
+              backgroundColor: isAgentPanelOpen ? 'rgba(255,255,255,0.2)' : theme.primary,
+              color: '#fff',
+              padding: '2px 6px',
+              borderRadius: '4px',
+              fontSize: '10px',
+              fontWeight: 'bold'
+            }}>AI</span>
+          </button>
           <button
             onClick={toggleDarkMode}
             style={{
               backgroundColor: theme.surface,
               border: `1px solid ${theme.border}`,
-              borderRadius: '6px',
-              padding: '8px 12px',
+              borderRadius: '8px',
+              padding: '8px 14px',
               color: theme.text,
               cursor: 'pointer',
-              fontSize: '12px'
+              fontSize: '13px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontWeight: '500',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = theme.hover
+              e.target.style.borderColor = theme.primary
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = theme.surface
+              e.target.style.borderColor = theme.border
             }}
           >
-            {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+            {isDarkMode ? <><IconSun size={16} /><span>Light</span></> : <><IconMoon size={16} /><span>Dark</span></>}
           </button>
         </div>
       </header>
@@ -4669,7 +4939,7 @@ function AppContent() {
                     fontSize: '14px',
                     lineHeight: '1.6'
                   }}>
-                    💡 <strong>Note:</strong> After creating this system design question, you'll be able to draw your architecture diagram in the main workspace using the Excalidraw canvas.
+                    <IconLightbulb size={16} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle' }} /><strong>Note:</strong> After creating this system design question, you'll be able to draw your architecture diagram in the main workspace using the Excalidraw canvas.
                   </p>
                 </div>
               )}
@@ -5596,7 +5866,7 @@ function AppContent() {
                   fontWeight: '500'
                 }}
               >
-                <span style={{ marginRight: '4px' }}>↻</span>Reset
+                <IconRefresh size={14} /><span style={{ marginLeft: '4px' }}>Reset</span>
               </button>
               <button
                 onClick={generateQuestions}
@@ -5614,7 +5884,7 @@ function AppContent() {
                   opacity: isGeneratingQuestions || !agentRequest.company || (useCustomRole ? !agentRequest.customRole : !agentRequest.role) ? 0.6 : 1
                 }}
               >
-                {isGeneratingQuestions ? 'Generating...' : <><span style={{ marginRight: '6px' }}>⚡</span>Generate Questions</>}
+                {isGeneratingQuestions ? 'Generating...' : <><IconZap size={14} style={{ marginRight: '6px' }} />Generate Questions</>}
               </button>
             </div>
           </div>
@@ -5690,7 +5960,7 @@ function AppContent() {
                     }}
                     title="Collapse sidebar"
                   >
-                    ◀
+                    <IconChevronLeft size={16} />
                   </button>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
@@ -5744,7 +6014,7 @@ function AppContent() {
                   onMouseEnter={(e) => e.target.style.opacity = '0.9'}
                   onMouseLeave={(e) => e.target.style.opacity = '1'}
                 >
-                  <span style={{ marginRight: '4px' }}>🗑</span>Clear All
+                  <IconTrash size={14} /><span style={{ marginLeft: '4px' }}>Clear All</span>
                 </button>
                 <button
                   onClick={async () => {
@@ -5816,7 +6086,7 @@ function AppContent() {
                     }
                   }}
                 >
-                  <span style={{ marginRight: '4px' }}>🗑</span>Clean AI
+                  <IconSparkles size={14} /><span style={{ marginLeft: '4px' }}>Clean AI</span>
                 </button>
               </div>
             </div>
@@ -5859,7 +6129,7 @@ function AppContent() {
                   color: theme.textSecondary,
                   fontSize: '14px',
                   pointerEvents: 'none'
-                }}>🔍</span>
+                }}><IconSearch size={14} /></span>
                 {searchQuery && (
                   <button
                     onClick={() => setSearchQuery('')}
@@ -5879,7 +6149,7 @@ function AppContent() {
                     onMouseEnter={(e) => e.target.style.color = theme.text}
                     onMouseLeave={(e) => e.target.style.color = theme.textSecondary}
                     title="Clear search"
-                  >✕</button>
+                  ><IconX size={14} /></button>
                 )}
               </div>
               
@@ -5994,7 +6264,7 @@ function AppContent() {
               }}>
                 {searchQuery ? (
                   <>
-                    <div style={{ fontSize: '32px', marginBottom: '12px' }}>🔍</div>
+                    <div style={{ marginBottom: '12px' }}><IconSearch size={32} /></div>
                     <p style={{ margin: 0, fontSize: '14px' }}>
                       No problems found matching "{searchQuery}"
                     </p>
@@ -6016,7 +6286,7 @@ function AppContent() {
                   </>
                 ) : (
                   <>
-                    <div style={{ fontSize: '32px', marginBottom: '12px' }}>📝</div>
+                    <div style={{ marginBottom: '12px', color: theme.textSecondary }}><IconFileText size={40} /></div>
                     <p style={{ margin: 0, fontSize: '14px' }}>
                       No problems available
                     </p>
@@ -6161,7 +6431,7 @@ function AppContent() {
                           }}
                           title="Delete problem"
                         >
-                          🗑️
+                          <IconTrash size={14} />
                         </button>
                       </div>
                       <div style={{
@@ -6285,7 +6555,7 @@ function AppContent() {
                       cursor: 'pointer'
                     }}
                   >
-                    {isJupyterMode ? <><span style={{ marginRight: '4px' }}>💻</span>IDE Mode</> : <><span style={{ marginRight: '4px' }}>📓</span>Jupyter Mode</>}
+                    {isJupyterMode ? <><IconMonitor size={14} /><span style={{ marginLeft: '4px' }}>IDE Mode</span></> : <><IconBook size={14} /><span style={{ marginLeft: '4px' }}>Jupyter Mode</span></>}
                   </button>
                   <button
                     onClick={() => {
@@ -6305,7 +6575,7 @@ function AppContent() {
                       fontSize: '11px'
                     }}
                   >
-                    ← Back
+                    <IconArrowLeft size={14} /><span style={{ marginLeft: '4px' }}>Back</span>
                   </button>
                 </div>
               </div>
@@ -6368,7 +6638,7 @@ function AppContent() {
                       onMouseEnter={(e) => e.target.style.opacity = '0.9'}
                       onMouseLeave={(e) => e.target.style.opacity = '1'}
                     >
-                      ▶
+                      <IconPlay size={14} />
                     </button>
                   )}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
@@ -6408,9 +6678,9 @@ function AppContent() {
                               justifyContent: 'center',
                               minWidth: '24px'
                             }}
-                            title="Previous Part (Ctrl/Cmd + ←)"
+                            title="Previous Part (Ctrl/Cmd + Left Arrow)"
                           >
-                            ←
+                            <IconChevronLeft size={14} />
                           </button>
                           
                           {/* Part Buttons */}
@@ -6474,9 +6744,9 @@ function AppContent() {
                               justifyContent: 'center',
                               minWidth: '24px'
                             }}
-                            title="Next Part (Ctrl/Cmd + →)"
+                            title="Next Part (Ctrl/Cmd + Right Arrow)"
                           >
-                            →
+                            <IconChevronRight size={14} />
                           </button>
                           
                           {/* Part Indicator */}
@@ -6739,7 +7009,7 @@ function AppContent() {
                             gap: '4px'
                             }}
                           >
-                          {isRunning ? 'Running...' : <><span>▶</span>Run</>}
+                          {isRunning ? 'Running...' : <><IconPlay size={14} /><span style={{ marginLeft: '4px' }}>Run</span></>}
                           </button>
                           <button
                           onClick={submitCode}
@@ -6775,7 +7045,7 @@ function AppContent() {
                               } else if (isLastPart) {
                                 return <><span>✓</span>Submit Final Part</>
                               } else {
-                                return <><span>→</span>Submit Part {selectedPart + 1} & Continue</>
+                                return <><IconArrowRight size={14} /><span style={{ marginLeft: '4px' }}>Submit Part {selectedPart + 1} & Continue</span></>
                               }
                             }
                             
@@ -7129,7 +7399,7 @@ function AppContent() {
                           fontWeight: '500'
                         }}
                       >
-                          {isRunning ? 'Running...' : <><span>▶</span>Run All</>}
+                          {isRunning ? 'Running...' : <><IconPlay size={14} /><span style={{ marginLeft: '4px' }}>Run All</span></>}
                       </button>
                       <button
                         onClick={submitCode}
@@ -7298,7 +7568,35 @@ function AppContent() {
                         </div>
             </div>
           ) : (
-            <div style={{ textAlign: 'center', padding: '40px' }}>
+            <div style={{ textAlign: 'center', padding: '40px', position: 'relative' }}>
+              {sidebarCollapsed && (
+                <button
+                  onClick={toggleSidebar}
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: '20px',
+                    backgroundColor: theme.primary,
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderTopRightRadius: '6px',
+                    borderBottomRightRadius: '6px',
+                    padding: '8px 10px',
+                    cursor: 'pointer',
+                    zIndex: 10,
+                    boxShadow: '2px 0 8px rgba(0,0,0,0.15)',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                  onMouseEnter={(e) => e.target.style.opacity = '0.9'}
+                  onMouseLeave={(e) => e.target.style.opacity = '1'}
+                  title="Expand sidebar"
+                >
+                  <IconChevronRight size={16} />
+                </button>
+              )}
               <p style={{ color: theme.textSecondary, fontSize: '16px' }}>
                 Select a problem from the sidebar to get started
               </p>
@@ -7505,6 +7803,37 @@ function AppContent() {
               </p>
             </div>
           </div>
+        </div>
+      )}
+      
+      {/* AI Agent Panel - Pair Programming & System Design */}
+      {isAgentPanelOpen && (
+        <div style={{
+          position: 'fixed',
+          top: '60px',
+          right: 0,
+          width: '400px',
+          height: 'calc(100vh - 60px)',
+          backgroundColor: theme.background,
+          borderLeft: `1px solid ${theme.border}`,
+          zIndex: 1000,
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: '-4px 0 20px rgba(0,0,0,0.1)'
+        }}>
+          <AgentPanel
+            isOpen={isAgentPanelOpen}
+            onClose={() => setIsAgentPanelOpen(false)}
+            problemContext={selectedProblem ? (selectedProblem.Statement || selectedProblem.statement) : ''}
+            codeContext={code}
+            language={selectedLanguage}
+            theme={theme}
+            isDarkMode={isDarkMode}
+            onInsertCode={(newCode) => {
+              // Insert code at cursor or append
+              setCode(prevCode => prevCode + '\n' + newCode)
+            }}
+          />
         </div>
       )}
   </div>
