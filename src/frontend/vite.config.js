@@ -29,11 +29,11 @@ export default defineConfig(({ mode }) => {
     server: {
       proxy: {
         '/api': 'http://localhost:8080'
-      }
-    },
-    build: {
-      rollupOptions: {
-        external: ['d3-sankey']
+    }
+  },
+  build: {
+    rollupOptions: {
+      external: ['d3-sankey']
       }
     }
   }

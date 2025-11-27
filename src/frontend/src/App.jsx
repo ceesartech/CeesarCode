@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, lazy, Suspense, useLayoutEffect, useMemo } from 'react'
+import React, { useEffect, useState, useRef, lazy, Suspense, useLayoutEffect, useMemo, useCallback } from 'react'
 import '@excalidraw/excalidraw/index.css'
 import Editor from '@monaco-editor/react'
 import { Terminal } from '@xterm/xterm'
@@ -465,10 +465,12 @@ const styles = {
 }
 
 // Terminal component using xterm.js (output only)
-const TerminalComponent = ({ output, theme, isDarkMode }) => {
+const TerminalComponent = ({ output, theme, isDarkMode, version }) => {
   const terminalRef = useRef(null)
   const terminalInstanceRef = useRef(null)
   const fitAddonRef = useRef(null)
+  const isReadyRef = useRef(false)
+  const placeholderMessage = 'Run your code to see output here...'
 
   useEffect(() => {
     if (!terminalRef.current) return
@@ -501,20 +503,30 @@ const TerminalComponent = ({ output, theme, isDarkMode }) => {
       lineHeight: 1.5,
       cursorBlink: false,
       cursorStyle: 'block',
-      scrollback: 1000,
+      scrollback: 2000,
+      convertEol: true,
+      allowTransparency: true,
+      rendererType: 'canvas',
       disableStdin: true
     })
 
     const fitAddon = new FitAddon()
     terminal.loadAddon(fitAddon)
     terminal.open(terminalRef.current)
-    fitAddon.fit()
+
+    const initialize = () => {
+      if (!fitAddonRef.current) return
+      fitAddon.fit()
+      isReadyRef.current = true
+    }
+    // Fit after the terminal is mounted per xterm.js guidelines
+    requestAnimationFrame(initialize)
 
     terminalInstanceRef.current = terminal
     fitAddonRef.current = fitAddon
 
     const handleResize = () => {
-      if (fitAddonRef.current) {
+      if (isReadyRef.current && fitAddonRef.current) {
         fitAddonRef.current.fit()
       }
     }
@@ -522,31 +534,38 @@ const TerminalComponent = ({ output, theme, isDarkMode }) => {
 
     return () => {
       window.removeEventListener('resize', handleResize)
+      isReadyRef.current = false
       terminal.dispose()
+      terminalInstanceRef.current = null
+      fitAddonRef.current = null
     }
   }, [isDarkMode])
 
   useEffect(() => {
-    if (!terminalInstanceRef.current) return
-    terminalInstanceRef.current.clear()
-    if (output) {
-      // Convert all \n to \r\n for proper terminal display
-      // First normalize any existing \r\n to \n, then convert all \n to \r\n
-      const formattedOutput = output
-        .replace(/\r\n/g, '\n')  // Normalize CRLF to LF
-        .replace(/\r/g, '\n')     // Normalize CR to LF
-        .replace(/\n/g, '\r\n')   // Convert all LF to CRLF for xterm
-      terminalInstanceRef.current.write(formattedOutput)
-    } else {
-      terminalInstanceRef.current.write('Run your code to see output here...\r\n')
-    }
-  }, [output])
+    if (!terminalInstanceRef.current || !isReadyRef.current) return
+
+    const term = terminalInstanceRef.current
+    term.reset()
+
+    const normalized = (output ?? placeholderMessage)
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      .split('\n')
+
+    normalized.forEach(line => {
+      term.writeln(line)
+    })
+    term.scrollToBottom()
+  }, [output, version])
 
   useEffect(() => {
-    if (fitAddonRef.current) {
-      setTimeout(() => fitAddonRef.current.fit(), 100)
-    }
-  }, [output])
+    if (!isReadyRef.current || !fitAddonRef.current) return
+    requestAnimationFrame(() => {
+      if (fitAddonRef.current) {
+        fitAddonRef.current.fit()
+      }
+    })
+  }, [output, version])
 
   return (
     <div ref={terminalRef} style={{ width: '100%', height: '100%', boxSizing: 'border-box' }} />
@@ -1190,7 +1209,12 @@ function AppContent() {
   const [code, setCode] = useState('')
   const [partCodes, setPartCodes] = useState({}) // Store code for each part: { 0: 'code1', 1: 'code2', ... }
   const [submittedParts, setSubmittedParts] = useState({}) // Track which parts have been submitted: { 0: true, 1: true, ... }
-  const [result, setResult] = useState(null)
+  const [result, setResultState] = useState(null)
+  const [consoleVersion, setConsoleVersion] = useState(0)
+  const setResult = useCallback((value) => {
+    setResultState(value)
+    setConsoleVersion(prev => prev + 1)
+  }, [setResultState, setConsoleVersion])
   const [isDarkMode, setIsDarkMode] = useState(() => {
     // Load dark mode preference from localStorage
     const saved = localStorage.getItem('ceesarcode-dark-mode')
@@ -7309,6 +7333,7 @@ function AppContent() {
                             ) : null}
                             theme={theme}
                             isDarkMode={isDarkMode}
+                            version={consoleVersion}
                           />
                                 </div>
                                 </div>
