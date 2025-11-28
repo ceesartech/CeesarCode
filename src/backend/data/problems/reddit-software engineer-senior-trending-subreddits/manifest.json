@@ -1,0 +1,35 @@
+{
+  "ID": "reddit-software engineer-senior-trending-subreddits",
+  "Title": "Real-time Trending Subreddits",
+  "Statement": "Part 1: Implement a system that identifies trending subreddits based on post activity. Given a stream of post events, each containing `(post_id: string, subreddit_id: string, timestamp: long)`, implement a function `get_top_trending_subreddits(k: int, time_window_seconds: int)` that returns the `k` most active `subreddit_id`s in the last `time_window_seconds`. Activity is defined by the count of unique posts within the window. Assume timestamps are Unix epoch milliseconds.\n\nExample:\nEvents stream: `[(p1, r/askreddit, 1000), (p2, r/pics, 1010), (p3, r/askreddit, 1020), (p4, r/funny, 1030), (p5, r/askreddit, 1040)]`\n`get_top_trending_subreddits(2, 50)` (current_time=1050):\nSubreddits: `r/askreddit` (3 posts), `r/pics` (1 post), `r/funny` (1 post)\nOutput: `[r/askreddit, r/pics]` (order can be arbitrary for ties, or by alphabetical/timestamp of first post)\n\nConstraints:\n- `1 \u003c= k \u003c= 100`\n- `1 \u003c= time_window_seconds \u003c= 3600`\n- Event timestamps are increasing but may not be perfectly ordered (minor skews).\n- Post IDs are unique. Subreddit IDs are unique.",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {
+    "cpp": "#include \u003cstring\u003e\n#include \u003cvector\u003e\n#include \u003cunordered_map\u003e\n#include \u003cdeque\u003e\n#include \u003calgorithm\u003e\n\nclass TrendingSubreddits {\npublic:\n    TrendingSubreddits() {\n        // Your code here\n    }\n\n    void addPostEvent(const std::string\u0026 postId, const std::string\u0026 subredditId, long long timestamp) {\n        // Your code here\n    }\n\n    std::vector\u003cstd::string\u003e getTopTrendingSubreddits(int k, int timeWindowSeconds) {\n        // Your code here\n        return {};\n    }\n};",
+    "go": "package main\n\ntype TrendingSubreddits struct {\n    // Your code here\n}\n\nfunc NewTrendingSubreddits() *TrendingSubreddits {\n    return \u0026TrendingSubreddits{\n        // Your code here\n    }\n}\n\nfunc (ts *TrendingSubreddits) AddPostEvent(postId, subredditId string, timestamp int64) {\n    // Your code here\n}\n\nfunc (ts *TrendingSubreddits) GetTopTrendingSubreddits(k, timeWindowSeconds int) []string {\n    // Your code here\n    return []string{}\n}",
+    "java": "import java.util.*;\n\nclass TrendingSubreddits {\n    public TrendingSubreddits() {\n    }\n\n    public void addPostEvent(String postId, String subredditId, long timestamp) {\n        // Your code here\n    }\n\n    public List\u003cString\u003e getTopTrendingSubreddits(int k, int timeWindowSeconds) {\n        // Your code here\n        return new ArrayList\u003c\u003e();\n    }\n}",
+    "javascript": "class TrendingSubreddits {\n    constructor() {\n        // Your code here\n    }\n\n    addPostEvent(postId, subredditId, timestamp) {\n        // Your code here\n    }\n\n    getTopTrendingSubreddits(k, timeWindowSeconds) {\n        // Your code here\n        return [];\n    }\n}",
+    "python": "import collections\nimport time\n\nclass TrendingSubreddits:\n    def __init__(self):\n        pass\n\n    def add_post_event(self, post_id: str, subreddit_id: str, timestamp: int):\n        # Your code here\n        pass\n\n    def get_top_trending_subreddits(self, k: int, time_window_seconds: int) -\u003e list[str]:\n        # Your code here\n        return []",
+    "rust": "use std::collections::HashMap;\nuse std::collections::VecDeque;\n\npub struct TrendingSubreddits {\n    // Your code here\n}\n\nimpl TrendingSubreddits {\n    pub fn new() -\u003e Self {\n        TrendingSubreddits {\n            // Your code here\n        }\n    }\n\n    pub fn add_post_event(\u0026mut self, post_id: String, subreddit_id: String, timestamp: i64) {\n        // Your code here\n    }\n\n    pub fn get_top_trending_subreddits(\u0026self, k: i32, time_window_seconds: i32) -\u003e Vec\u003cString\u003e {\n        // Your code here\n        vec![]\n    }\n}"
+  },
+  "Type": "coding",
+  "IsMultiPart": true,
+  "Parts": [
+    {
+      "partNumber": 2,
+      "statement": "Part 2: Enhance the trending algorithm to incorporate upvote events. In addition to post events, your system now also receives `(post_id: string, timestamp: long, upvote_change: int)` events. A subreddit's score should be `(post_count * post_weight) + (total_upvote_sum * upvote_weight)`. Update `get_top_trending_subreddits` to use this new scoring. Assume `post_weight` and `upvote_weight` are configurable parameters (e.g., `1.0` and `0.5`).\n\nExample:\nEvents stream (assume `post_weight=1`, `upvote_weight=0.5`):\n`[(p1, r/askreddit, 1000), (p2, r/pics, 1010), (p3, r/askreddit, 1020), (p4, r/funny, 1030), (p5, r/askreddit, 1040), (p1, 1015, +10), (p3, 1035, +5), (p2, 1045, +20)]`\n`get_top_trending_subreddits(2, 50)` (current_time=1050):\nSubreddit scores:\n`r/askreddit`: (3 posts * 1) + ((10 upvotes on p1 + 5 upvotes on p3) * 0.5) = 3 + (15 * 0.5) = 3 + 7.5 = 10.5\n`r/pics`: (1 post * 1) + (20 upvotes on p2 * 0.5) = 1 + (20 * 0.5) = 1 + 10 = 11\n`r/funny`: (1 post * 1) + (0 upvotes * 0.5) = 1 + 0 = 1\nOutput: `[r/pics, r/askreddit]`",
+      "stub": null
+    },
+    {
+      "partNumber": 3,
+      "statement": "Part 3: Discuss scalability and real-time considerations for an extremely high-volume scenario (millions of events per second) and very large time windows (hours or days). How would you design a distributed system to handle this, minimizing latency for `get_top_trending_subreddits`? Focus on the data structures and architectural patterns you'd employ (e.g., stream processing, approximate algorithms, specialized databases). The coding part would involve outlining the updated `add_post_event` and `get_top_trending_subreddits` methods to *conceptually* interact with such a distributed backend (e.g., `self.distributed_aggregator.add_event(...)`, `self.distributed_store.get_ranking(...)`), but the actual implementation of the distributed parts is out of scope for the coding solution. The focus is on adapting the local logic for interaction with a high-level abstraction.",
+      "stub": null
+    }
+  ]
+}

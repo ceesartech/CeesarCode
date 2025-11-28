@@ -1,0 +1,22 @@
+{
+  "ID": "reddit-software engineer-senior-subreddit-autocomplete",
+  "Title": "Subreddit Autocomplete and Search Suggestions",
+  "Statement": "When users start typing in the search bar or in the 'create post' dialog, Reddit provides real-time suggestions for subreddits. Implement a system to efficiently provide autocomplete suggestions based on a collection of existing subreddit names.\n\nYour system should:\n1.  Allow adding new subreddit names.\n2.  Given a prefix, return a list of up to `k` suggested subreddit names that start with that prefix, sorted alphabetically. If there are fewer than `k` matches, return all of them.\n\nConsider the constraints: there can be millions of subreddits, and suggestions need to be fast.\n\nExample:\nSubreddits: [\"r/AskReddit\", \"r/aww\", \"r/programming\", \"r/politics\", \"r/ProgrammerHumor\"]\n\n`add_subreddit(\"r/pics\")`\n`add_subreddit(\"r/funny\")`\n\n`get_suggestions(\"r/p\", k=3)` -\u003e [\"r/pics\", \"r/politics\", \"r/programming\"]\n`get_suggestions(\"r/pro\", k=5)` -\u003e [\"r/ProgrammerHumor\", \"r/programming\"]\n`get_suggestions(\"r/z\", k=2)` -\u003e []",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {
+    "cpp": "#include \u003cvector\u003e\n#include \u003cstring\u003e\n#include \u003calgorithm\u003e\n#include \u003cmap\u003e\n\nclass AutocompleteSystem {\npublic:\n    AutocompleteSystem() {\n        // Your initialization here\n    }\n\n    void addSubreddit(const std::string\u0026 subredditName) {\n        // Your code here\n    }\n\n    std::vector\u003cstd::string\u003e getSuggestions(const std::string\u0026 prefix, int k) {\n        // Your code here\n        return {};\n    }\n};",
+    "go": "package main\n\ntype AutocompleteSystem struct {\n    // Your data structures here\n}\n\nfunc NewAutocompleteSystem() *AutocompleteSystem {\n    // Your initialization here\n    return \u0026AutocompleteSystem{}\n}\n\nfunc (as *AutocompleteSystem) AddSubreddit(subredditName string) {\n    // Your code here\n}\n\nfunc (as *AutocompleteSystem) GetSuggestions(prefix string, k int) []string {\n    // Your code here\n    return []string{}\n}",
+    "java": "import java.util.List;\nimport java.util.ArrayList;\nimport java.util.Collections;\nimport java.util.Comparator;\n\nclass AutocompleteSystem {\n    // Your data structures here\n\n    public AutocompleteSystem() {\n        // Your initialization here\n    }\n\n    public void addSubreddit(String subredditName) {\n        // Your code here\n    }\n\n    public List\u003cString\u003e getSuggestions(String prefix, int k) {\n        // Your code here\n        return new ArrayList\u003c\u003e();\n    }\n}",
+    "javascript": "class AutocompleteSystem {\n    constructor() {\n        // Your initialization here\n    }\n\n    add_subreddit(subredditName) {\n        // Your code here\n    }\n\n    get_suggestions(prefix, k) {\n        // Your code here\n        return [];\n    }\n}",
+    "python": "from typing import List\n\nclass AutocompleteSystem:\n    def __init__(self):\n        # Your initialization here\n        pass\n\n    def add_subreddit(self, subreddit_name: str) -\u003e None:\n        # Your code here\n        pass\n\n    def get_suggestions(self, prefix: str, k: int) -\u003e List[str]:\n        # Your code here\n        pass",
+    "rust": "use std::collections::HashMap;\n\npub struct AutocompleteSystem {\n    // Your data structures here\n}\n\nimpl AutocompleteSystem {\n    pub fn new() -\u003e Self {\n        // Your initialization here\n        AutocompleteSystem {}\n    }\n\n    pub fn add_subreddit(\u0026mut self, subreddit_name: String) {\n        // Your code here\n    }\n\n    pub fn get_suggestions(\u0026self, prefix: \u0026str, k: i32) -\u003e Vec\u003cString\u003e {\n        // Your code here\n        vec![]\n    }\n}"
+  },
+  "Type": "coding"
+}

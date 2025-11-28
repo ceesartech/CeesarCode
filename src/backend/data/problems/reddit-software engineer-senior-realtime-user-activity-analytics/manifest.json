@@ -1,0 +1,15 @@
+{
+  "ID": "reddit-software engineer-senior-realtime-user-activity-analytics",
+  "Title": "System Design: Real-time User Activity Analytics",
+  "Statement": "Design a resilient and scalable pipeline for collecting, processing, and analyzing real-time user activity data (e.g., page views, clicks, votes) across Reddit, supporting both operational monitoring and long-term analytics.",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {},
+  "Type": "system_design"
+}

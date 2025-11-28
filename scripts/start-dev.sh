@@ -37,32 +37,99 @@ print_header() {
     echo -e "${PURPLE}================================${NC}"
 }
 
+# Detect OS
+detect_os() {
+    case "$(uname -s)" in
+        Linux*)     echo "Linux" ;;
+        Darwin*)    echo "Mac" ;;
+        CYGWIN*)    echo "Windows" ;;
+        MINGW*)     echo "Windows" ;;
+        MSYS*)      echo "Windows" ;;
+        *)          echo "Unknown" ;;
+    esac
+}
+
+OS=$(detect_os)
+
 # Function to check if command exists
 command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# Function to check if port is in use
+# Function to check if port is in use (cross-platform)
 port_in_use() {
-    lsof -ti:"$1" >/dev/null 2>&1
+    local port=$1
+    if [ "$OS" = "Windows" ]; then
+        # Windows: use netstat to check if port is listening
+        netstat -ano 2>/dev/null | grep -q ":$port " && return 0
+        netstat -ano 2>/dev/null | grep -q " 0.0.0.0:$port " && return 0
+        netstat -ano 2>/dev/null | grep -q " :::$port " && return 0
+        return 1
+    else
+        # Unix/Linux/Mac: use lsof
+        lsof -ti:"$port" >/dev/null 2>&1
+    fi
 }
 
-# Function to kill processes on port
+# Function to kill processes on port (cross-platform)
 kill_port() {
     local port=$1
     if port_in_use "$port"; then
         print_warning "Port $port is in use. Killing existing processes..."
-        lsof -ti:"$port" | xargs kill -9 2>/dev/null || true
+        if [ "$OS" = "Windows" ]; then
+            # Windows: find and kill process using the port
+            # netstat -ano format: Proto Local Address Foreign Address State PID
+            # We need to extract the PID (last column) from lines containing the port
+            local pids=$(netstat -ano 2>/dev/null | grep ":$port " | awk '{print $NF}' | sort -u)
+            for pid in $pids; do
+                # Filter out invalid PIDs
+                if [ -n "$pid" ] && [ "$pid" != "0" ] && [ "$pid" != "PID" ] && [ "$pid" -gt 0 ] 2>/dev/null; then
+                    taskkill //F //PID "$pid" 2>/dev/null || true
+                fi
+            done
+        else
+            # Unix/Linux/Mac: use lsof and kill
+            lsof -ti:"$port" | xargs kill -9 2>/dev/null || true
+        fi
         sleep 2
     fi
 }
 
-# Function to cleanup on exit
+# Function to check if process is running (cross-platform)
+process_running() {
+    local pid=$1
+    if [ -z "$pid" ]; then
+        return 1
+    fi
+    if [ "$OS" = "Windows" ]; then
+        # Windows: check if process exists using tasklist
+        tasklist //FI "PID eq $pid" 2>/dev/null | grep -q "$pid"
+    else
+        # Unix/Linux/Mac: use kill -0
+        kill -0 "$pid" 2>/dev/null
+    fi
+}
+
+# Function to cleanup on exit (cross-platform)
 cleanup() {
     print_status "Cleaning up processes..."
-    pkill -f "go run main.go" 2>/dev/null || true
-    pkill -f "npm run dev" 2>/dev/null || true
-    pkill -f "vite" 2>/dev/null || true
+    if [ "$OS" = "Windows" ]; then
+        # Windows: use taskkill with process name filters
+        taskkill //F //IM "go.exe" //T 2>/dev/null || true
+        taskkill //F //IM "node.exe" //T 2>/dev/null || true
+        # Also try to kill by PID if we have them
+        if [ -n "$BACKEND_PID" ]; then
+            taskkill //F //PID "$BACKEND_PID" 2>/dev/null || true
+        fi
+        if [ -n "$FRONTEND_PID" ]; then
+            taskkill //F //PID "$FRONTEND_PID" 2>/dev/null || true
+        fi
+    else
+        # Unix/Linux/Mac: use pkill
+        pkill -f "go run main.go" 2>/dev/null || true
+        pkill -f "npm run dev" 2>/dev/null || true
+        pkill -f "vite" 2>/dev/null || true
+    fi
     print_success "Cleanup complete!"
     exit 0
 }
@@ -94,11 +161,6 @@ main() {
         print_error "Please run this script from the CeesarCode root directory"
         exit 1
     fi
-    
-    # Kill any existing processes on our ports
-    print_status "Checking for existing processes..."
-    kill_port 8080
-    kill_port 5173
     
     # Load AI API key and provider - check command line arguments first, then .env file
     AI_PROVIDER="gemini"
@@ -184,6 +246,14 @@ main() {
     print_status "Usage: $0 [-p|--provider gemini|openai|claude] [-k|--api-key KEY]"
     print_status "  Or run './scripts/setup-ai.sh' to set up AI generation"
     
+    # Get backend port from environment (may be set in .env) or use default
+    BACKEND_PORT=${PORT:-8080}
+    
+    # Kill any existing processes on our ports
+    print_status "Checking for existing processes..."
+    kill_port "$BACKEND_PORT"
+    kill_port 5173
+    
     # Start backend
     print_status "Starting Go backend server..."
     cd src/backend
@@ -206,12 +276,12 @@ main() {
     sleep 3
     
     # Check if backend started successfully
-    if ! port_in_use 8080; then
+    if ! port_in_use "$BACKEND_PORT"; then
         print_error "Backend failed to start. Check logs/backend.log for details."
         exit 1
     fi
     
-    print_success "Backend started successfully on http://localhost:8080"
+    print_success "Backend started successfully on http://localhost:$BACKEND_PORT"
     
     # Start frontend
     print_status "Starting React frontend..."
@@ -234,7 +304,11 @@ main() {
     # Check if frontend started successfully
     if ! port_in_use 5173; then
         print_error "Frontend failed to start. Check logs/frontend.log for details."
-        kill $BACKEND_PID 2>/dev/null || true
+        if [ "$OS" = "Windows" ]; then
+            taskkill //F //PID "$BACKEND_PID" 2>/dev/null || true
+        else
+            kill $BACKEND_PID 2>/dev/null || true
+        fi
         exit 1
     fi
     
@@ -248,7 +322,7 @@ main() {
     print_success "🎉 CeesarCode is now running!"
     echo ""
     echo -e "${CYAN}🌐 Frontend:${NC} http://localhost:5173"
-    echo -e "${CYAN}🔧 Backend API:${NC} http://localhost:8080"
+    echo -e "${CYAN}🔧 Backend API:${NC} http://localhost:$BACKEND_PORT"
     echo ""
     echo -e "${CYAN}📋 What you can do:${NC}"
     echo "   • Open http://localhost:5173 in your browser"
@@ -270,12 +344,12 @@ main() {
     
     # Monitor processes
     while true; do
-        if ! kill -0 $BACKEND_PID 2>/dev/null; then
+        if ! process_running $BACKEND_PID; then
             print_error "Backend process died unexpectedly"
             break
         fi
         
-        if ! kill -0 $FRONTEND_PID 2>/dev/null; then
+        if ! process_running $FRONTEND_PID; then
             print_error "Frontend process died unexpectedly"
             break
         fi

@@ -1,0 +1,15 @@
+{
+  "ID": "reddit-software engineer-senior-personalized-home-feed-generation",
+  "Title": "System Design: Personalized Home Feed Generation",
+  "Statement": "Design a system for generating a personalized home feed for a Reddit user, prioritizing high availability, low latency, and efficient content ranking and retrieval for millions of users.",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {},
+  "Type": "system_design"
+}

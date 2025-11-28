@@ -1,0 +1,35 @@
+{
+  "ID": "reddit-software engineer-senior-distributed-upvote-counter",
+  "Title": "Distributed Post Upvote Counter",
+  "Statement": "Part 1: Implement a `PostUpvoteCounter` class that manages upvote counts for various posts. It should provide three thread-safe methods: `upvote(post_id: str)`, `downvote(post_id: str)`, and `get_votes(post_id: str) -\u003e int`. Assume it runs as a single instance in a multi-threaded environment. Upvotes and downvotes should increment/decrement the count for a given post ID.\n\nExample:\n`counter = PostUpvoteCounter()`\n`counter.upvote('postA')`\n`counter.upvote('postB')`\n`counter.upvote('postA')`\n`counter.downvote('postA')`\n`counter.get_votes('postA')` should return `1`\n`counter.get_votes('postB')` should return `1`\n`counter.get_votes('postC')` should return `0`",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {
+    "cpp": "#include \u003cstring\u003e\n#include \u003cunordered_map\u003e\n#include \u003cmutex\u003e\n\nclass PostUpvoteCounter {\npublic:\n    PostUpvoteCounter() {\n        // Your code here\n    }\n\n    void upvote(const std::string\u0026 postId) {\n        // Your code here\n    }\n\n    void downvote(const std::string\u0026 postId) {\n        // Your code here\n    }\n\n    int getVotes(const std::string\u0026 postId) {\n        // Your code here\n        return 0;\n    }\n};\n",
+    "go": "package main\n\nimport (\n\t\"sync\"\n)\n\ntype PostUpvoteCounter struct {\n\t// Your code here\n}\n\nfunc NewPostUpvoteCounter() *PostUpvoteCounter {\n\treturn \u0026PostUpvoteCounter{\n\t\t// Your code here\n\t}\n}\n\nfunc (c *PostUpvoteCounter) Upvote(postId string) {\n\t// Your code here\n}\n\nfunc (c *PostUpvoteCounter) Downvote(postId string) {\n\t// Your code here\n}\n\nfunc (c *PostUpvoteCounter) GetVotes(postId string) int {\n\t// Your code here\n\treturn 0\n}",
+    "java": "import java.util.concurrent.ConcurrentHashMap;\nimport java.util.concurrent.atomic.AtomicInteger;\n\nclass PostUpvoteCounter {\n    public PostUpvoteCounter() {\n        // Your code here\n    }\n\n    public void upvote(String postId) {\n        // Your code here\n    }\n\n    public void downvote(String postId) {\n        // Your code here\n    }\n\n    public int getVotes(String postId) {\n        // Your code here\n        return 0;\n    }\n}",
+    "javascript": "class PostUpvoteCounter {\n    constructor() {\n        // Your code here\n    }\n\n    upvote(postId) {\n        // Your code here\n    }\n\n    downvote(postId) {\n        // Your code here\n    }\n\n    getVotes(postId) {\n        // Your code here\n        return 0;\n    }\n}",
+    "python": "import threading\n\nclass PostUpvoteCounter:\n    def __init__(self):\n        # Your code here\n        pass\n\n    def upvote(self, post_id: str):\n        # Your code here\n        pass\n\n    def downvote(self, post_id: str):\n        # Your code here\n        pass\n\n    def get_votes(self, post_id: str) -\u003e int:\n        # Your code here\n        return 0",
+    "rust": "use std::collections::HashMap;\nuse std::sync::{Arc, Mutex};\n\npub struct PostUpvoteCounter {\n    // Your code here\n}\n\nimpl PostUpvoteCounter {\n    pub fn new() -\u003e Self {\n        PostUpvoteCounter {\n            // Your code here\n        }\n    }\n\n    pub fn upvote(\u0026mut self, post_id: String) {\n        // Your code here\n    }\n\n    pub fn downvote(\u0026mut self, post_id: String) {\n        // Your code here\n    }\n\n    pub fn get_votes(\u0026self, post_id: String) -\u003e i32 {\n        // Your code here\n        0\n    }\n}"
+  },
+  "Type": "coding",
+  "IsMultiPart": true,
+  "Parts": [
+    {
+      "partNumber": 2,
+      "statement": "Part 2: The upvote counts need to be persistent. Modify `PostUpvoteCounter` to interact with a (simulated) database. Assume you have `db_write(post_id: str, count: int)` and `db_read(post_id: str) -\u003e int` functions, which can occasionally fail or be slow. Your class should now handle persistence, ensuring that even with concurrent updates and potential database failures, the counts eventually reflect the correct values. Focus on strategies like optimistic locking, retries, or asynchronous updates to a durable log (e.g., Kafka producer) for *a single instance* trying to maintain consistency with an external store.\n\nExample:\n`db_write('postA', 1)` might fail, but `get_votes('postA')` should still eventually return the correct value after retries or other mechanisms.",
+      "stub": null
+    },
+    {
+      "partNumber": 3,
+      "statement": "Part 3: Design the architecture for a highly scalable and fault-tolerant upvote counting service for millions of posts and millions of concurrent users spread across multiple data centers. Discuss how you would handle challenges like strong vs. eventual consistency for upvote counts, network partitions, conflict resolution, and potential technologies (e.g., Redis, Cassandra, Kafka, Zookeeper/etcd). The coding part should focus on outlining a `DistributedUpvoteClient`'s API and describing how its internal methods (`upvote`, `downvote`, `get_votes`) would interact with the distributed system components you've described (e.g., `self.kafka_producer.send(...)`, `self.redis_cache.get(...)`, `self.consistency_manager.resolve(...)`).",
+      "stub": null
+    }
+  ]
+}

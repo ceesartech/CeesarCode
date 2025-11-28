@@ -1,0 +1,15 @@
+{
+  "ID": "reddit-software engineer-senior-reddit-personalized-feed-system",
+  "Title": "System Design: Personalized Home Feed",
+  "Statement": "Design Reddit's personalized home feed system, capable of serving a unique, real-time stream of posts to hundreds of millions of users. Consider user subscriptions, content ranking (hot, new, controversial), real-time updates for new posts/comments, and ensuring low latency and high availability under peak load.",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {},
+  "Type": "system_design"
+}

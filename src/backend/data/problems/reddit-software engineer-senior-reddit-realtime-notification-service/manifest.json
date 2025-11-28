@@ -1,0 +1,15 @@
+{
+  "ID": "reddit-software engineer-senior-reddit-realtime-notification-service",
+  "Title": "System Design: Real-time Notification Service",
+  "Statement": "Design a real-time notification system for Reddit that delivers various types of notifications (e.g., new comment replies, trending posts, direct messages, subreddit activity) to millions of users across web and mobile platforms. Focus on efficient fan-out, delivery guarantees, personalization, and handling sudden traffic spikes.",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {},
+  "Type": "system_design"
+}

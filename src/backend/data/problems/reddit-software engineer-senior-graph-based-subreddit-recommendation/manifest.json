@@ -1,0 +1,22 @@
+{
+  "ID": "reddit-software engineer-senior-graph-based-subreddit-recommendation",
+  "Title": "Graph-based Subreddit Recommendation",
+  "Statement": "Reddit aims to connect users with relevant communities. A simplified approach to recommending new subreddits to a user could involve analyzing their existing subscriptions and finding similar subreddits. For this problem, we'll model user-subreddit relationships as a bipartite graph and implement a function to suggest subreddits.\n\nAssume you have a data structure representing user subscriptions, `user_subscriptions: Dict[str, List[str]]`, where keys are `user_id`s and values are lists of `subreddit_id`s they subscribe to.\n\nImplement `recommend_subreddits(user_id: str, user_subscriptions: Dict[str, List[str]], num_recommendations: int) -\u003e List[str]`.\nThis function should:\n1.  Identify subreddits that are frequently subscribed to by users who also subscribe to subreddits the target `user_id` is subscribed to.\n2.  Return a list of `num_recommendations` `subreddit_id`s that the user is NOT already subscribed to, sorted by their 'recommendation score' in descending order. The 'recommendation score' for a subreddit can be the number of distinct other users (who also subscribe to the target user's subreddits) that subscribe to it. Tie-breaking can be alphabetical by `subreddit_id`.\n\nExample:\nuser_subscriptions = {\n    \"userA\": [\"r/funny\", \"r/pics\", \"r/askreddit\"],\n    \"userB\": [\"r/funny\", \"r/memes\"],\n    \"userC\": [\"r/pics\", \"r/aww\", \"r/memes\"],\n    \"userD\": [\"r/askreddit\", \"r/science\"],\n}\n\n`recommend_subreddits(\"userA\", user_subscriptions, 2)`:\nUserA subscribes to: `r/funny`, `r/pics`, `r/askreddit`\n\nUsers who also subscribe to these:\n- `userB` (r/funny) also subscribes to `r/memes`\n- `userC` (r/pics) also subscribes to `r/aww`, `r/memes`\n- `userD` (r/askreddit) also subscribes to `r/science`\n\nRecommendation Scores for new subreddits for userA:\n- `r/memes`: 2 (from userB, userC)\n- `r/aww`: 1 (from userC)\n- `r/science`: 1 (from userD)\n\nOutput: [\"r/memes\", \"r/aww\"] (or [\"r/memes\", \"r/science\"] if tie-breaking by alphabetical name; let's specify alphabetical then)",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {
+    "cpp": "#include \u003cvector\u003e\n#include \u003cstring\u003e\n#include \u003cunordered_map\u003e\n#include \u003cunordered_set\u003e\n#include \u003calgorithm\u003e\n\nclass Solution {\npublic:\n    std::vector\u003cstd::string\u003e recommendSubreddits(const std::string\u0026 userId, const std::unordered_map\u003cstd::string, std::vector\u003cstd::string\u003e\u003e\u0026 userSubscriptions, int numRecommendations) {\n        // Your code here\n        return {};\n    }\n};",
+    "go": "package main\n\nimport (\n    \"sort\"\n)\n\nfunc RecommendSubreddits(userId string, userSubscriptions map[string][]string, numRecommendations int) []string {\n    // Your code here\n    return []string{}\n}",
+    "java": "import java.util.List;\nimport java.util.ArrayList;\nimport java.util.Map;\nimport java.util.HashMap;\nimport java.util.Set;\nimport java.util.HashSet;\nimport java.util.Comparator;\nimport java.util.Collections;\n\nclass Solution {\n    public List\u003cString\u003e recommendSubreddits(String userId, Map\u003cString, List\u003cString\u003e\u003e userSubscriptions, int numRecommendations) {\n        // Your code here\n        return new ArrayList\u003c\u003e();\n    }\n}",
+    "javascript": "function recommendSubreddits(userId, userSubscriptions, numRecommendations) {\n    // Your code here\n    return [];\n}",
+    "python": "from typing import List, Dict, Set\nfrom collections import defaultdict\n\ndef recommend_subreddits(user_id: str, user_subscriptions: Dict[str, List[str]], num_recommendations: int) -\u003e List[str]:\n    # Your code here\n    pass",
+    "rust": "use std::collections::{HashMap, HashSet};\n\npub fn recommend_subreddits(\n    user_id: \u0026str,\n    user_subscriptions: \u0026HashMap\u003cString, Vec\u003cString\u003e\u003e,\n    num_recommendations: usize,\n) -\u003e Vec\u003cString\u003e {\n    // Your code here\n    vec![]\n}"
+  },
+  "Type": "coding"
+}

@@ -1,0 +1,40 @@
+{
+  "ID": "reddit-software engineer-senior-distributed-unique-id-generator",
+  "Title": "Distributed Unique ID Generator",
+  "Statement": "Reddit generates unique IDs for various entities like posts, comments, and users. In a distributed, high-traffic environment, simply incrementing a counter is not feasible. Design and implement a system to generate globally unique, preferably monotonically increasing, and approximately time-sortable IDs.",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {
+    "cpp": "#include \u003catomic\u003e\n\nclass UniqueIDGenerator {\nprivate:\n    std::atomic\u003clong long\u003e counter_;\npublic:\n    UniqueIDGenerator() : counter_(0) {}\n\n    long long generateId() {\n        // Your code for Part 1\n        return -1;\n    }\n};",
+    "go": "package main\n\nimport (\n    \"sync/atomic\"\n)\n\ntype UniqueIDGenerator struct {\n    counter atomic.Int64\n}\n\nfunc NewUniqueIDGenerator() *UniqueIDGenerator {\n    return \u0026UniqueIDGenerator{}\n}\n\nfunc (gen *UniqueIDGenerator) GenerateId() int64 {\n    // Your code for Part 1\n    return -1\n}",
+    "java": "import java.util.concurrent.atomic.AtomicLong;\n\nclass UniqueIDGenerator {\n    private AtomicLong counter;\n\n    public UniqueIDGenerator() {\n        this.counter = new AtomicLong(0);\n    }\n\n    public long generateId() {\n        // Your code for Part 1\n        return -1;\n    }\n}",
+    "javascript": "class UniqueIDGenerator {\n    constructor() {\n        this.counter = 0;\n    }\n\n    generateId() {\n        // Your code for Part 1\n        return -1;\n    }\n}",
+    "python": "import time\nimport threading\n\nclass UniqueIDGenerator:\n    def __init__(self):\n        self.counter = 0\n        self.lock = threading.Lock()\n\n    def generate_id(self) -\u003e int:\n        # Your code for Part 1\n        pass",
+    "rust": "use std::sync::atomic::{AtomicU64, Ordering};\n\npub struct UniqueIDGenerator {\n    counter: AtomicU64,\n}\n\nimpl UniqueIDGenerator {\n    pub fn new() -\u003e Self {\n        UniqueIDGenerator { counter: AtomicU64::new(0) }\n    }\n\n    pub fn generate_id(\u0026self) -\u003e u64 {\n        // Your code for Part 1\n        0\n    }\n}"
+  },
+  "Type": "coding",
+  "IsMultiPart": true,
+  "Parts": [
+    {
+      "partNumber": 1,
+      "statement": "Implement a simple, thread-safe `UniqueIDGenerator` class for a single-machine environment that generates sequentially increasing integer IDs. The `generate_id()` method should return a new, unique ID each time it's called. Demonstrate thread-safety.",
+      "stub": null
+    },
+    {
+      "partNumber": 2,
+      "statement": "Explain the challenges of scaling the `UniqueIDGenerator` from Part 1 to a distributed system (multiple machines, potentially different data centers). Discuss common problems like collisions, clock skew, and bottlenecks. Propose a high-level design for a distributed unique ID generation system that addresses these challenges, aiming for globally unique, monotonically increasing, and time-sortable IDs. Mention concepts like worker IDs, timestamps, sequence numbers, and how they can be combined.",
+      "stub": null
+    },
+    {
+      "partNumber": 3,
+      "statement": "Implement a simplified version of a distributed unique ID generator, similar to Twitter's Snowflake ID. Your `generate_id()` function should combine a timestamp, a 'worker ID' (to identify the generating machine/process), and a sequence number. Assume `worker_id` is a constructor argument (e.g., a 10-bit integer) and `current_timestamp_millis` is available. The generated ID should be a single 64-bit integer. Handle potential sequence number rollovers within the same millisecond. Explain the bit allocation for each component and the maximum values supported.",
+      "stub": null
+    }
+  ]
+}

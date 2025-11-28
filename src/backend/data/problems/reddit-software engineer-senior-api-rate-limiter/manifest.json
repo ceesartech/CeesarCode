@@ -1,0 +1,35 @@
+{
+  "ID": "reddit-software engineer-senior-api-rate-limiter",
+  "Title": "Distributed API Rate Limiter",
+  "Statement": "Part 1: Implement a `RateLimiter` class that enforces a 'token bucket' rate limiting strategy for API calls per user. The class should have a constructor `RateLimiter(max_requests: int, time_window_seconds: int)` and a method `allow_request(user_id: str) -\u003e bool`. A user is allowed `max_requests` within a `time_window_seconds`. If tokens are available, `allow_request` returns `true` and consumes a token; otherwise, it returns `false`. Tokens are refilled at a fixed rate, ensuring that over `time_window_seconds`, no more than `max_requests` are allowed. Assume current time can be obtained via `time.time()` (Python) or similar.\n\nExample:\n`limiter = RateLimiter(max_requests=2, time_window_seconds=1)`\n`limiter.allow_request('user1')` -\u003e `true` (at t=0.0)\n`limiter.allow_request('user1')` -\u003e `true` (at t=0.1)\n`limiter.allow_request('user1')` -\u003e `false` (at t=0.2, bucket empty)\n`time.sleep(1.0)`\n`limiter.allow_request('user1')` -\u003e `true` (at t=1.2, bucket refilled)\n\nConstraints:\n- `max_requests \u003e= 1`\n- `time_window_seconds \u003e= 1`",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {
+    "cpp": "#include \u003cstring\u003e\n#include \u003cunordered_map\u003e\n#include \u003cchrono\u003e\n#include \u003cmutex\u003e\n\nclass RateLimiter {\npublic:\n    RateLimiter(int maxRequests, int timeWindowSeconds) {\n        // Your code here\n    }\n\n    bool allowRequest(const std::string\u0026 userId) {\n        // Your code here\n        return true;\n    }\n};\n",
+    "go": "package main\n\nimport (\n\t\"sync\"\n\t\"time\"\n)\n\ntype RateLimiter struct {\n\t// Your code here\n}\n\nfunc NewRateLimiter(maxRequests, timeWindowSeconds int) *RateLimiter {\n\treturn \u0026RateLimiter{\n\t\t// Your code here\n\t}\n}\n\nfunc (rl *RateLimiter) AllowRequest(userId string) bool {\n\t// Your code here\n\treturn true\n}",
+    "java": "import java.util.concurrent.ConcurrentHashMap;\nimport java.util.concurrent.TimeUnit;\n\nclass RateLimiter {\n    public RateLimiter(int maxRequests, int timeWindowSeconds) {\n        // Your code here\n    }\n\n    public boolean allowRequest(String userId) {\n        // Your code here\n        return true;\n    }\n}",
+    "javascript": "class RateLimiter {\n    constructor(maxRequests, timeWindowSeconds) {\n        // Your code here\n    }\n\n    allowRequest(userId) {\n        // Your code here\n        return true;\n    }\n}",
+    "python": "import time\nimport threading\n\nclass RateLimiter:\n    def __init__(self, max_requests: int, time_window_seconds: int):\n        # Your code here\n        pass\n\n    def allow_request(self, user_id: str) -\u003e bool:\n        # Your code here\n        return True",
+    "rust": "use std::collections::HashMap;\nuse std::time::{Instant, Duration};\nuse std::sync::{Arc, Mutex};\n\npub struct RateLimiter {\n    // Your code here\n}\n\nimpl RateLimiter {\n    pub fn new(max_requests: u32, time_window_seconds: u32) -\u003e Self {\n        RateLimiter {\n            // Your code here\n        }\n    }\n\n    pub fn allow_request(\u0026mut self, user_id: String) -\u003e bool {\n        // Your code here\n        true\n    }\n}"
+  },
+  "Type": "coding",
+  "IsMultiPart": true,
+  "Parts": [
+    {
+      "partNumber": 2,
+      "statement": "Part 2: Modify the `RateLimiter` to allow for a burst of `burst_factor` times `max_requests` initially (or when a bucket is fully refilled after a long idle period), before settling into the steady `max_requests` per `time_window_seconds` rate. The refill logic should still respect the average `max_requests` over the `time_window_seconds`.\n\nExample:\n`limiter = RateLimiter(max_requests=2, time_window_seconds=1, burst_factor=2)` (meaning initial burst of 4 requests)\n`limiter.allow_request('user1')` -\u003e `true` (at t=0.0)\n`limiter.allow_request('user1')` -\u003e `true` (at t=0.1)\n`limiter.allow_request('user1')` -\u003e `true` (at t=0.2)\n`limiter.allow_request('user1')` -\u003e `true` (at t=0.3)\n`limiter.allow_request('user1')` -\u003e `false` (at t=0.4, burst capacity used, now at steady state)\n`time.sleep(0.6)` (total t=1.0, 2 tokens refilled)\n`limiter.allow_request('user1')` -\u003e `true` (at t=1.0, 2 tokens refilled, 1 consumed)\n`limiter.allow_request('user1')` -\u003e `true` (at t=1.1, 1 consumed)\n`limiter.allow_request('user1')` -\u003e `false` (at t=1.2)",
+      "stub": null
+    },
+    {
+      "partNumber": 3,
+      "statement": "Part 3: Discuss how you would implement this `RateLimiter` in a distributed microservices environment where requests for the same user could hit different instances. Consider challenges like shared state, consistency, race conditions, and handling clock skews. Propose architectural solutions and specific technologies (e.g., Redis with Lua scripts, distributed counters) that could be used. The coding part should outline a high-level `DistributedRateLimiter` API and how its `allow_request` method would interact with an external distributed store or coordination service (e.g., `self.distributed_store.try_consume_token(user_id)`).",
+      "stub": null
+    }
+  ]
+}

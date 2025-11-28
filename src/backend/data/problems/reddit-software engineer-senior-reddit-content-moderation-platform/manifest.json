@@ -1,0 +1,15 @@
+{
+  "ID": "reddit-software engineer-senior-reddit-content-moderation-platform",
+  "Title": "System Design: Real-time Content Moderation Platform",
+  "Statement": "Design a real-time content moderation platform for Reddit to detect and act upon problematic content (e.g., spam, hate speech, illegal material) in posts and comments. The system should integrate machine learning models, support both automated actions and human moderator review workflows, and scale to Reddit's content velocity.",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {},
+  "Type": "system_design"
+}

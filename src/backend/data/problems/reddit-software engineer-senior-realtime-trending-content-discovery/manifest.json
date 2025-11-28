@@ -1,0 +1,15 @@
+{
+  "ID": "reddit-software engineer-senior-realtime-trending-content-discovery",
+  "Title": "System Design: Real-time Trending Content Discovery",
+  "Statement": "Design a system to identify and surface trending posts and subreddits across Reddit in near real-time, considering factors like vote velocity, comment activity, and time decay.",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {},
+  "Type": "system_design"
+}

@@ -1,0 +1,15 @@
+{
+  "ID": "reddit-software engineer-senior-reddit-fulltext-search-engine",
+  "Title": "System Design: Reddit Full-Text Search Engine",
+  "Statement": "Design a scalable and low-latency full-text search engine for Reddit posts and comments, supporting complex queries and ensuring that new content is discoverable quickly.",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {},
+  "Type": "system_design"
+}

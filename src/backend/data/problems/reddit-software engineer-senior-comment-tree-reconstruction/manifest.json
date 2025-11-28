@@ -1,0 +1,22 @@
+{
+  "ID": "reddit-software engineer-senior-comment-tree-reconstruction",
+  "Title": "Reconstruct Nested Comment Tree",
+  "Statement": "Reddit comments are displayed in a nested tree structure, where comments can reply to other comments. Given a flat list of `Comment` objects, where each comment has a `parent_id` (null or empty string if it's a top-level comment), reconstruct the full nested comment tree. The output should be a list of top-level `CommentNode`s, each containing its direct children, which can in turn contain their children, and so on.\n\n`Comment` class:\n`comment_id` (string)\n`parent_id` (string, can be null or empty string for top-level comments)\n`text` (string)\n\n`CommentNode` class:\n`comment` (Comment object)\n`children` (list of CommentNode objects)\n\nExample:\nInput `comments`:\n[\n    Comment(\"c1\", \"\", \"Top comment 1\"),\n    Comment(\"c2\", \"c1\", \"Reply to c1\"),\n    Comment(\"c3\", \"\", \"Top comment 2\"),\n    Comment(\"c4\", \"c2\", \"Reply to c2\"),\n    Comment(\"c5\", \"c1\", \"Another reply to c1\")\n]\n\nExpected Output (conceptual representation):\n[\n  CommentNode(c1, [\n    CommentNode(c2, [\n      CommentNode(c4, [])\n    ]),\n    CommentNode(c5, [])\n  ]),\n  CommentNode(c3, [])\n]",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {
+    "cpp": "#include \u003cvector\u003e\n#include \u003cstring\u003e\n#include \u003cmap\u003e\n\nstruct Comment {\n    std::string commentId;\n    std::string parentId;\n    std::string text;\n};\n\nstruct CommentNode {\n    Comment comment;\n    std::vector\u003cCommentNode\u003e children;\n\n    CommentNode(Comment c) : comment(c) {}\n};\n\nclass Solution {\npublic:\n    std::vector\u003cCommentNode\u003e reconstructCommentTree(const std::vector\u003cComment\u003e\u0026 comments) {\n        // Your code here\n        return {};\n    }\n};",
+    "go": "package main\n\ntype Comment struct {\n    CommentId string\n    ParentId string\n    Text string\n}\n\ntype CommentNode struct {\n    Comment Comment\n    Children []*CommentNode\n}\n\nfunc ReconstructCommentTree(comments []Comment) []*CommentNode {\n    // Your code here\n    return []*CommentNode{}\n}",
+    "java": "import java.util.List;\nimport java.util.ArrayList;\nimport java.util.Map;\nimport java.util.HashMap;\n\nclass Comment {\n    String commentId;\n    String parentId;\n    String text;\n\n    public Comment(String commentId, String parentId, String text) {\n        this.commentId = commentId;\n        this.parentId = parentId;\n        this.text = text;\n    }\n}\n\nclass CommentNode {\n    Comment comment;\n    List\u003cCommentNode\u003e children;\n\n    public CommentNode(Comment comment) {\n        this.comment = comment;\n        this.children = new ArrayList\u003c\u003e();\n    }\n}\n\nclass Solution {\n    public List\u003cCommentNode\u003e reconstructCommentTree(List\u003cComment\u003e comments) {\n        // Your code here\n        return new ArrayList\u003c\u003e();\n    }\n}",
+    "javascript": "class Comment {\n    constructor(commentId, parentId, text) {\n        this.commentId = commentId;\n        this.parentId = parentId;\n        this.text = text;\n    }\n}\n\nclass CommentNode {\n    constructor(comment) {\n        this.comment = comment;\n        this.children = [];\n    }\n}\n\nfunction reconstructCommentTree(comments) {\n    // Your code here\n    return [];\n}",
+    "python": "from typing import List, Optional\n\nclass Comment:\n    def __init__(self, comment_id: str, parent_id: Optional[str], text: str):\n        self.comment_id = comment_id\n        self.parent_id = parent_id\n        self.text = text\n\nclass CommentNode:\n    def __init__(self, comment: Comment):\n        self.comment = comment\n        self.children = [] # type: List[CommentNode]\n\ndef reconstruct_comment_tree(comments: List[Comment]) -\u003e List[CommentNode]:\n    # Your code here\n    pass",
+    "rust": "pub struct Comment {\n    pub comment_id: String,\n    pub parent_id: Option\u003cString\u003e,\n    pub text: String,\n}\n\npub struct CommentNode {\n    pub comment: Comment,\n    pub children: Vec\u003cCommentNode\u003e,\n}\n\npub fn reconstruct_comment_tree(comments: Vec\u003cComment\u003e) -\u003e Vec\u003cCommentNode\u003e {\n    // Your code here\n    vec![]\n}"
+  },
+  "Type": "coding"
+}

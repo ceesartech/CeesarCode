@@ -1,0 +1,15 @@
+{
+  "ID": "reddit-software engineer-senior-scalable-realtime-voting-system",
+  "Title": "System Design: Scalable Real-time Voting System",
+  "Statement": "Design a highly scalable and fault-tolerant system to handle real-time upvotes and downvotes on posts and comments across Reddit, ensuring consistency and responsiveness under heavy load.",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {},
+  "Type": "system_design"
+}

@@ -1,0 +1,22 @@
+{
+  "ID": "reddit-software engineer-senior-content-moderation-filter",
+  "Title": "Content Moderation Keyword Filter",
+  "Statement": "Implement a `ModerationFilter` class that can efficiently detect forbidden keywords and phrases within a given text (e.g., a post title or comment body). The class should support:\n1.  `add_forbidden_term(term: str)`: Adds a single word or phrase to the forbidden list.\n2.  `is_text_forbidden(text: str) -\u003e bool`: Returns `true` if any part of the `text` contains a forbidden term. Matching should be case-insensitive.\n\nOptimize `is_text_forbidden` for speed, given a potentially large dictionary of forbidden terms (up to 100,000 terms) and long input texts (up to 10,000 characters). Consider using an appropriate data structure for efficient string matching (e.g., Aho-Corasick algorithm or a Trie-based approach).\n\nExample:\n`filter = ModerationFilter()`\n`filter.add_forbidden_term('badword')`\n`filter.add_forbidden_term('spam link')`\n`filter.is_text_forbidden('This is a clean post.')` -\u003e `false`\n`filter.is_text_forbidden('Contains a BadWord here.')` -\u003e `true`\n`filter.is_text_forbidden('Check out this SPAM LINK now!')` -\u003e `true`\n`filter.is_text_forbidden('badwordsarebad')` -\u003e `true` (implies substring match is desired)",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {
+    "cpp": "#include \u003cstring\u003e\n#include \u003cvector\u003e\n#include \u003cunordered_set\u003e\n\nclass ModerationFilter {\npublic:\n    ModerationFilter() {\n        // Your code here\n    }\n\n    void addForbiddenTerm(const std::string\u0026 term) {\n        // Your code here\n    }\n\n    bool isTextForbidden(const std::string\u0026 text) {\n        // Your code here\n        return false;\n    }\n};\n",
+    "go": "package main\n\ntype ModerationFilter struct {\n\t// Your code here\n}\n\nfunc NewModerationFilter() *ModerationFilter {\n\treturn \u0026ModerationFilter{\n\t\t// Your code here\n\t}\n}\n\nfunc (mf *ModerationFilter) AddForbiddenTerm(term string) {\n\t// Your code here\n}\n\nfunc (mf *ModerationFilter) IsTextForbidden(text string) bool {\n\t// Your code here\n\treturn false\n}",
+    "java": "import java.util.*;\n\nclass ModerationFilter {\n    public ModerationFilter() {\n        // Your code here\n    }\n\n    public void addForbiddenTerm(String term) {\n        // Your code here\n    }\n\n    public boolean isTextForbidden(String text) {\n        // Your code here\n        return false;\n    }\n}",
+    "javascript": "class ModerationFilter {\n    constructor() {\n        // Your code here\n    }\n\n    addForbiddenTerm(term) {\n        // Your code here\n    }\n\n    isTextForbidden(text) {\n        // Your code here\n        return false;\n    }\n}",
+    "python": "class ModerationFilter:\n    def __init__(self):\n        # Your code here (e.g., Aho-Corasick Trie or similar)\n        pass\n\n    def add_forbidden_term(self, term: str):\n        # Your code here\n        pass\n\n    def is_text_forbidden(self, text: str) -\u003e bool:\n        # Your code here\n        return False",
+    "rust": "use std::collections::HashSet;\n\npub struct ModerationFilter {\n    // Your code here\n}\n\nimpl ModerationFilter {\n    pub fn new() -\u003e Self {\n        ModerationFilter {\n            // Your code here\n        }\n    }\n\n    pub fn add_forbidden_term(\u0026mut self, term: String) {\n        // Your code here\n    }\n\n    pub fn is_text_forbidden(\u0026self, text: String) -\u003e bool {\n        // Your code here\n        false\n    }\n}"
+  },
+  "Type": "coding"
+}

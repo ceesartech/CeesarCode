@@ -1,0 +1,15 @@
+{
+  "ID": "reddit-software engineer-senior-distributed-notification-platform",
+  "Title": "System Design: Distributed Notification Platform",
+  "Statement": "Design a robust and scalable distributed notification system for Reddit, capable of delivering millions of push notifications, in-app alerts, and email summaries for various user-defined events.",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {},
+  "Type": "system_design"
+}

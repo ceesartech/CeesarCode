@@ -1,0 +1,15 @@
+{
+  "ID": "reddit-software engineer-senior-reddit-live-event-system",
+  "Title": "System Design: Real-time Live Event System",
+  "Statement": "Design a real-time system to support live events on Reddit, such as 'Ask Me Anything' (AMA) sessions or live audio conversations (e.g., Reddit Talk). Focus on low-latency communication for thousands to millions of concurrent participants, message persistence, moderation tools, and robust fault tolerance.",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {},
+  "Type": "system_design"
+}

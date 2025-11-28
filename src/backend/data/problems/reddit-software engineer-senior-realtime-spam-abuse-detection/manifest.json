@@ -1,0 +1,15 @@
+{
+  "ID": "reddit-software engineer-senior-realtime-spam-abuse-detection",
+  "Title": "System Design: Real-time Spam and Abuse Detection",
+  "Statement": "Design a real-time system to detect and mitigate spam, bot activity, and other forms of abuse on Reddit posts and comments, integrating machine learning models and human review workflows.",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {},
+  "Type": "system_design"
+}

@@ -1,0 +1,15 @@
+{
+  "ID": "reddit-software engineer-senior-reddit-distributed-upvote-downvote",
+  "Title": "System Design: Distributed Upvote/Downvote System",
+  "Statement": "Design a highly scalable and fault-tolerant system for handling upvotes and downvotes on posts and comments across Reddit. Address challenges like high write throughput, eventual consistency for score aggregation, real-time display of scores, and mitigating vote manipulation (e.g., bot detection).",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {},
+  "Type": "system_design"
+}

@@ -1,0 +1,15 @@
+{
+  "ID": "reddit-software engineer-senior-subreddit-recommendation-engine",
+  "Title": "System Design: Subreddit Recommendation Engine",
+  "Statement": "Design a system that provides personalized subreddit recommendations to new and existing Reddit users, balancing exploration with relevancy based on user interactions and content.",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {},
+  "Type": "system_design"
+}

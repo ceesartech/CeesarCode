@@ -1,0 +1,15 @@
+{
+  "ID": "reddit-software engineer-senior-reddit-distributed-search-engine",
+  "Title": "System Design: Distributed Search Engine",
+  "Statement": "Design a distributed search engine for Reddit that enables users to efficiently search across billions of posts, comments, and subreddits. Key considerations include indexing strategies for rapidly changing content, query performance at scale, relevance ranking, and handling multilingual content.",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {},
+  "Type": "system_design"
+}

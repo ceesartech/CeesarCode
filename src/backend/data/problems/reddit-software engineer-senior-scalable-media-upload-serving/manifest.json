@@ -1,0 +1,15 @@
+{
+  "ID": "reddit-software engineer-senior-scalable-media-upload-serving",
+  "Title": "System Design: Scalable Media Upload and Serving",
+  "Statement": "Design a highly available and scalable system for users to upload, process, and serve images and short videos on Reddit, optimizing for upload speed, content quality, and global delivery.",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {},
+  "Type": "system_design"
+}

@@ -1,0 +1,15 @@
+{
+  "ID": "reddit-software engineer-senior-reddit-ad-serving-platform",
+  "Title": "System Design: Targeted Ad Serving Platform",
+  "Statement": "Design a scalable and low-latency ad serving platform for Reddit. This platform should be capable of selecting and delivering targeted ads to users based on their interests and browsing history, track impressions and clicks, manage ad inventory, and handle high request volumes while respecting user privacy.",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {},
+  "Type": "system_design"
+}

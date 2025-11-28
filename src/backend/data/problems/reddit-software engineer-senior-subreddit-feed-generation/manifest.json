@@ -1,0 +1,40 @@
+{
+  "ID": "reddit-software engineer-senior-subreddit-feed-generation",
+  "Title": "Subreddit Feed Generation with Advanced Ranking",
+  "Statement": "Reddit users consume content through various feeds. One of the core functionalities is generating a feed for a specific subreddit or a personalized front-page feed. For this problem, we'll simplify and focus on generating a subreddit feed.",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {
+    "cpp": "#include \u003cvector\u003e\n#include \u003cstring\u003e\n#include \u003calgorithm\u003e\n\nstruct Post {\n    std::string postId;\n    std::string title;\n    std::string subredditId;\n    int upvotes;\n    int downvotes;\n    long long createdAt; // Unix timestamp\n};\n\nclass Solution {\npublic:\n    std::vector\u003cstd::string\u003e getSubredditFeed(const std::vector\u003cPost\u003e\u0026 posts, const std::string\u0026 subredditId) {\n        // Your code here for Part 1\n        return {};\n    }\n};",
+    "go": "package main\n\ntype Post struct {\n    PostId string\n    Title string\n    SubredditId string\n    Upvotes int\n    Downvotes int\n    CreatedAt int64 // Unix timestamp\n}\n\nfunc GetSubredditFeed(posts []Post, subredditId string) []string {\n    // Your code here for Part 1\n    return []string{}\n}",
+    "java": "import java.util.List;\nimport java.util.ArrayList;\nimport java.util.Comparator;\n\nclass Post {\n    String postId;\n    String title;\n    String subredditId;\n    int upvotes;\n    int downvotes;\n    long createdAt; // Unix timestamp\n\n    public Post(String postId, String title, String subredditId, int upvotes, int downvotes, long createdAt) {\n        this.postId = postId;\n        this.title = title;\n        this.subredditId = subredditId;\n        this.upvotes = upvotes;\n        this.downvotes = downvotes;\n        this.createdAt = createdAt;\n    }\n}\n\nclass Solution {\n    public List\u003cString\u003e getSubredditFeed(List\u003cPost\u003e posts, String subredditId) {\n        // Your code here for Part 1\n        return new ArrayList\u003c\u003e();\n    }\n}",
+    "javascript": "class Post {\n    constructor(postId, title, subredditId, upvotes, downvotes, createdAt) {\n        this.postId = postId;\n        this.title = title;\n        this.subredditId = subredditId;\n        this.upvotes = upvotes;\n        this.downvotes = downvotes;\n        this.createdAt = createdAt; // Unix timestamp\n    }\n}\n\nfunction getSubredditFeed(posts, subredditId) {\n    // Your code here for Part 1\n    return [];\n}",
+    "python": "from typing import List, Dict, Any\n\nclass Post:\n    def __init__(self, post_id: str, title: str, subreddit_id: str, upvotes: int, downvotes: int, created_at: int):\n        self.post_id = post_id\n        self.title = title\n        self.subreddit_id = subreddit_id\n        self.upvotes = upvotes\n        self.downvotes = downvotes\n        self.created_at = created_at # Unix timestamp\n\ndef get_subreddit_feed(posts: List[Post], subreddit_id: str) -\u003e List[str]:\n    # Your code here for Part 1\n    pass",
+    "rust": "pub struct Post {\n    pub post_id: String,\n    pub title: String,\n    pub subreddit_id: String,\n    pub upvotes: i32,\n    pub downvotes: i32,\n    pub created_at: i64, // Unix timestamp\n}\n\npub fn get_subreddit_feed(posts: \u0026[Post], subreddit_id: \u0026str) -\u003e Vec\u003cString\u003e {\n    // Your code here for Part 1\n    vec![]\n}"
+  },
+  "Type": "coding",
+  "IsMultiPart": true,
+  "Parts": [
+    {
+      "partNumber": 1,
+      "statement": "Given a list of `Post` objects and a `subreddit_id`, implement `get_subreddit_feed` to return a list of `post_id`s belonging to that subreddit, sorted by their `created_at` timestamp in descending order (most recent first).\n\nExample:\nPosts: [\n    Post(\"p1\", \"Title A\", \"r/funny\", 10, 2, 1678886400),\n    Post(\"p2\", \"Title B\", \"r/pics\", 5, 1, 1678886500),\n    Post(\"p3\", \"Title C\", \"r/funny\", 20, 5, 1678886600)\n]\nsubreddit_id: \"r/funny\"\nOutput: [\"p3\", \"p1\"]",
+      "stub": null
+    },
+    {
+      "partNumber": 2,
+      "statement": "Now, modify `get_subreddit_feed` to sort posts by a simplified 'hot' score. The 'hot' score for a post can be calculated as `(post.upvotes - post.downvotes) / ( (current_timestamp - post.created_at) / 3600 + 1)`. The higher the score, the 'hotter' the post. Assume `current_timestamp` is provided as an argument. Return `post_id`s sorted by 'hot' score in descending order.\n\nExample (using example posts from Part 1, current_timestamp = 1678886700):\nPost p1 score: (10-2) / ((1678886700 - 1678886400)/3600 + 1) = 8 / (300/3600 + 1) = 8 / (0.083 + 1) approx 7.38\nPost p3 score: (20-5) / ((1678886700 - 1678886600)/3600 + 1) = 15 / (100/3600 + 1) = 15 / (0.027 + 1) approx 14.6\n\nOutput: [\"p3\", \"p1\"] (assuming the `get_subreddit_feed` now takes `current_timestamp`)",
+      "stub": null
+    },
+    {
+      "partNumber": 3,
+      "statement": "A user's front-page feed combines posts from all subreddits they subscribe to. Design and implement a function `get_user_front_page_feed(posts: List[Post], subscribed_subreddit_ids: List[str], current_timestamp: int) -\u003e List[str]`. This function should return a list of `post_id`s from the `posts` that belong to any of the `subscribed_subreddit_ids`, sorted by the 'hot' score as defined in Part 2. Optimize for performance, considering that the `posts` list could be very large and a user might subscribe to many subreddits. Explain any data structures or strategies you would use to make this efficient in a real-world scenario.",
+      "stub": null
+    }
+  ]
+}

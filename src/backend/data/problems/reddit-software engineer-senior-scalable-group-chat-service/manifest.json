@@ -1,0 +1,15 @@
+{
+  "ID": "reddit-software engineer-senior-scalable-group-chat-service",
+  "Title": "System Design: Scalable Group Chat Service",
+  "Statement": "Design a scalable, highly available, and low-latency group chat service for Reddit users, supporting direct messages and subreddit-specific chat rooms.",
+  "Languages": [
+    "python",
+    "java",
+    "cpp",
+    "javascript",
+    "go",
+    "rust"
+  ],
+  "Stub": {},
+  "Type": "system_design"
+}
