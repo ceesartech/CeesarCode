@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"time"
 
@@ -708,11 +709,21 @@ func runPythonCode(dir, input string) (stdout, stderr string, err error) {
 		log.Printf("Using Python file: %s", mainPy)
 	}
 
-	cmd := exec.Command("python3", mainPy)
+	// Find the correct Python command for this platform
+	pythonCmd := findPythonCommand()
+	// Handle py -3 on Windows (needs to be split)
+	var cmd *exec.Cmd
+	if strings.HasPrefix(pythonCmd, "py ") {
+		// Split "py -3" into ["py", "-3", mainPy]
+		parts := strings.Fields(pythonCmd)
+		cmd = exec.Command(parts[0], append(parts[1:], mainPy)...)
+	} else {
+		cmd = exec.Command(pythonCmd, mainPy)
+	}
 	cmd.Dir = dir
 	cmd.Stdin = strings.NewReader(input)
 
-	log.Printf("Executing: python3 %s (in dir: %s)", mainPy, dir)
+	log.Printf("Executing: %s %s (in dir: %s)", pythonCmd, mainPy, dir)
 
 	// Use CombinedOutput to capture both stdout and stderr
 	// For Python, stdout and stderr are combined, but we'll treat it as stdout
@@ -1471,6 +1482,48 @@ func getEnv(k, d string) string {
 		return d
 	}
 	return v
+}
+
+// findPythonCommand finds the correct Python command for the current platform
+// On Windows, tries: py -3, py, python, python3
+// On Unix/Mac, tries: python3, python
+func findPythonCommand() string {
+	var candidates []string
+	
+	if strings.HasPrefix(runtime.GOOS, "windows") {
+		// On Windows, try py launcher with -3 flag first (recommended)
+		// Then try other options
+		candidates = []string{"py", "python", "python3"}
+	} else {
+		// On Unix/Mac, prefer python3
+		candidates = []string{"python3", "python"}
+	}
+	
+	for _, cmd := range candidates {
+		if path, err := exec.LookPath(cmd); err == nil {
+			// Verify it's actually Python by checking version
+			// For Windows py launcher, use -3 flag
+			var testCmd *exec.Cmd
+			if cmd == "py" && strings.HasPrefix(runtime.GOOS, "windows") {
+				testCmd = exec.Command(path, "-3", "--version")
+			} else {
+				testCmd = exec.Command(path, "--version")
+			}
+			
+			if err := testCmd.Run(); err == nil {
+				log.Printf("Found Python command: %s (at %s)", cmd, path)
+				// Return with -3 flag for py on Windows
+				if cmd == "py" && strings.HasPrefix(runtime.GOOS, "windows") {
+					return "py -3"
+				}
+				return cmd
+			}
+		}
+	}
+	
+	// Fallback to python3 if nothing found (will give better error message)
+	log.Printf("Warning: No Python command found, defaulting to python3")
+	return "python3"
 }
 
 func generateQuestions(w http.ResponseWriter, r *http.Request) {
