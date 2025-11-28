@@ -4250,6 +4250,46 @@ function AppContent() {
     return () => window.removeEventListener('keydown', handleGlobalKeyDown)
   }, [selectedProblem, code, isRunning, isSubmittingCode, selectedLanguage, showShortcuts, isDarkMode, selectedPart])
 
+  // Clear Excalidraw canvas data when switching problems
+  useEffect(() => {
+    // Clear the ref when selected problem changes
+    excalidrawDataRef.current = ''
+  }, [selectedProblem ? (selectedProblem.ID || selectedProblem.id) : null])
+
+  // Memoize initialData for Excalidraw to prevent reset on fullscreen toggle
+  const excalidrawInitialData = useMemo(() => {
+    if (!selectedProblem) {
+      return {
+        elements: [],
+        appState: { collaborators: new Map() },
+        files: {}
+      }
+    }
+    try {
+      if (selectedProblem.DrawingData) {
+        const parsed = JSON.parse(selectedProblem.DrawingData)
+        // Ensure appState has required structure
+        if (parsed.appState && !parsed.appState.collaborators) {
+          parsed.appState.collaborators = new Map()
+        }
+        return parsed
+      }
+      // Return default structure with collaborators
+      return {
+        elements: [],
+        appState: { collaborators: new Map() },
+        files: {}
+      }
+    } catch (err) {
+      console.error('Failed to parse drawing data:', err)
+      return {
+        elements: [],
+        appState: { collaborators: new Map() },
+        files: {}
+      }
+    }
+  }, [selectedProblem ? (selectedProblem.ID || selectedProblem.id) : null, selectedProblem?.DrawingData])
+
   useEffect(() => {
     if (!selectedProblem) {
       setSelectedPart(0)
@@ -6916,32 +6956,9 @@ function AppContent() {
                           </div>
                         }>
                           <Excalidraw
+                            key={selectedProblem?.ID || selectedProblem?.id || 'no-problem'}
                             onChange={handleExcalidrawChange}
-                            initialData={(() => {
-                              try {
-                                if (selectedProblem.DrawingData) {
-                                  const parsed = JSON.parse(selectedProblem.DrawingData)
-                                  // Ensure appState has required structure
-                                  if (parsed.appState && !parsed.appState.collaborators) {
-                                    parsed.appState.collaborators = new Map()
-                                  }
-                                  return parsed
-                                }
-                                // Return default structure with collaborators
-                                return {
-                                  elements: [],
-                                  appState: { collaborators: new Map() },
-                                  files: {}
-                                }
-                              } catch (err) {
-                                console.error('Failed to parse drawing data:', err)
-                                return {
-                                  elements: [],
-                                  appState: { collaborators: new Map() },
-                                  files: {}
-                                }
-                              }
-                            })()}
+                            initialData={excalidrawInitialData}
                             theme={isDarkMode ? 'dark' : 'light'}
                           />
                         </Suspense>

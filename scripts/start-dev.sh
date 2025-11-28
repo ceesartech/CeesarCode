@@ -246,6 +246,9 @@ main() {
     print_status "Usage: $0 [-p|--provider gemini|openai|claude] [-k|--api-key KEY]"
     print_status "  Or run './scripts/setup-ai.sh' to set up AI generation"
     
+    # Create logs directory if it doesn't exist (must be before starting services)
+    mkdir -p logs
+    
     # Get backend port from environment (may be set in .env) or use default
     BACKEND_PORT=${PORT:-8080}
     
@@ -313,9 +316,6 @@ main() {
     fi
     
     print_success "Frontend started successfully on http://localhost:5173"
-    
-    # Create logs directory if it doesn't exist
-    mkdir -p logs
     
     # Display success message
     echo ""
