@@ -260,6 +260,11 @@ main() {
     # Start backend
     print_status "Starting Go backend server..."
     cd src/backend
+    
+    # Ensure Go dependencies are downloaded (needed for Windows where go.sum might be missing)
+    print_status "Ensuring Go dependencies are downloaded..."
+    go mod tidy > /dev/null 2>&1 || true
+    
     # Export all API keys (backend will choose based on request)
     if [ -n "$GEMINI_API_KEY" ]; then
         export GEMINI_API_KEY
