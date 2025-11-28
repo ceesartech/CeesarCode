@@ -349,14 +349,27 @@ main() {
     
     # Monitor processes
     while true; do
-        if ! process_running $BACKEND_PID; then
-            print_error "Backend process died unexpectedly"
-            break
-        fi
-        
-        if ! process_running $FRONTEND_PID; then
-            print_error "Frontend process died unexpectedly"
-            break
+        # On Windows, go run spawns child processes, so check port instead of PID
+        if [ "$OS" = "Windows" ]; then
+            if ! port_in_use "$BACKEND_PORT"; then
+                print_error "Backend process died unexpectedly (port $BACKEND_PORT is no longer in use)"
+                break
+            fi
+            if ! port_in_use 5173; then
+                print_error "Frontend process died unexpectedly (port 5173 is no longer in use)"
+                break
+            fi
+        else
+            # On Unix/Mac, we can reliably check PIDs
+            if ! process_running $BACKEND_PID; then
+                print_error "Backend process died unexpectedly"
+                break
+            fi
+            
+            if ! process_running $FRONTEND_PID; then
+                print_error "Frontend process died unexpectedly"
+                break
+            fi
         fi
         
         sleep 5
